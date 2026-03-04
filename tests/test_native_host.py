@@ -664,3 +664,72 @@ class TestNativeHostChatAsync:
                             "test message", "run123", {"_callbackId": "cb1"}
                         )
                         assert result["type"] == "error"
+
+    @pytest.mark.asyncio
+    async def test_chat_streaming_success(self, tmp_path):
+        """Chat streaming processes messages and returns response."""
+        handler = self._make_handler()
+
+        har_dir = tmp_path / "har"
+        har_dir.mkdir(parents=True)
+        (har_dir / "recording.har").write_text('{"log": {}}')
+
+        scripts_dir = tmp_path / "scripts"
+        scripts_dir.mkdir(parents=True)
+
+        from claude_agent_sdk import (
+            AssistantMessage,
+            ResultMessage,
+            TextBlock,
+            ToolResultBlock,
+            ToolUseBlock,
+        )
+
+        mock_text = MagicMock(spec=TextBlock)
+        mock_text.text = "Here is the API client."
+
+        mock_tool_use = MagicMock(spec=ToolUseBlock)
+        mock_tool_use.name = "Write"
+        mock_tool_use.input = {"file_path": "/test.py", "content": "code"}
+
+        mock_tool_result = MagicMock(spec=ToolResultBlock)
+        mock_tool_result.is_error = False
+        mock_tool_result.content = "File written"
+
+        mock_assistant = MagicMock(spec=AssistantMessage)
+        mock_assistant.content = [mock_text, mock_tool_use, mock_tool_result]
+
+        mock_result = MagicMock(spec=ResultMessage)
+        mock_result.is_error = False
+        mock_result.total_cost_usd = 0.01
+        mock_result.duration_ms = 5000
+
+        mock_client = AsyncMock()
+        mock_client.query = AsyncMock()
+
+        async def mock_receive():
+            yield mock_assistant
+            yield mock_result
+
+        mock_client.receive_response = mock_receive
+
+        with patch("reverse_api.utils.get_har_dir", return_value=har_dir):
+            with patch("reverse_api.utils.get_scripts_dir", return_value=scripts_dir):
+                with patch("reverse_api.native_host.send_message") as mock_send:
+                    mock_sdk = MagicMock()
+                    mock_sdk.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+                    mock_sdk.return_value.__aexit__ = AsyncMock(return_value=False)
+                    with patch("claude_agent_sdk.ClaudeSDKClient", mock_sdk):
+                        result = await handler._chat_async_streaming(
+                            "generate client", "run123", {"_callbackId": "cb1"}
+                        )
+                        assert result["type"] == "chat_response"
+                        assert "Here is the API client." in result["message"]
+                        assert handler.current_run_id == "run123"
+
+                        # Verify agent events were sent
+                        sent_types = [call[0][0].get("event_type") for call in mock_send.call_args_list if call[0][0].get("type") == "agent_event"]
+                        assert "text" in sent_types
+                        assert "tool_use" in sent_types
+                        assert "tool_result" in sent_types
+                        assert "done" in sent_types

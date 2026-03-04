@@ -2,7 +2,7 @@
 
 import re
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -546,3 +546,350 @@ class TestGenerateFolderName:
             with patch("reverse_api.utils.asyncio.run", return_value="test_result") as mock_run:
                 result = generate_folder_name("test prompt", sdk="opencode", session_id="sess123")
                 assert result == "test_result"
+
+
+class TestGenerateFolderNameAsync:
+    """Test _generate_folder_name_async function."""
+
+    @pytest.mark.asyncio
+    async def test_async_with_sdk_response(self):
+        """Async function returns cleaned folder name from SDK."""
+        from reverse_api.utils import _generate_folder_name_async
+        from claude_agent_sdk import AssistantMessage, TextBlock
+
+        mock_text = MagicMock(spec=TextBlock)
+        mock_text.text = "  Apple_Jobs_API  "
+
+        mock_assistant = MagicMock(spec=AssistantMessage)
+        mock_assistant.content = [mock_text]
+
+        mock_client = AsyncMock()
+        mock_client.query = AsyncMock()
+
+        async def mock_receive():
+            yield mock_assistant
+
+        mock_client.receive_response = mock_receive
+
+        with patch("claude_agent_sdk.ClaudeSDKClient") as mock_sdk:
+            mock_sdk.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_sdk.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            result = await _generate_folder_name_async("Get Apple jobs API")
+            assert result == "apple_jobs_api"
+
+    @pytest.mark.asyncio
+    async def test_async_empty_response_falls_back(self):
+        """Async function falls back to slugify on empty response."""
+        from reverse_api.utils import _generate_folder_name_async
+
+        mock_client = AsyncMock()
+        mock_client.query = AsyncMock()
+
+        async def mock_receive():
+            return
+            yield
+
+        mock_client.receive_response = mock_receive
+
+        with patch("claude_agent_sdk.ClaudeSDKClient") as mock_sdk:
+            mock_sdk.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_sdk.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            result = await _generate_folder_name_async("test api capture")
+            assert result == "test_api_capture"
+
+    @pytest.mark.asyncio
+    async def test_async_cleans_special_chars(self):
+        """Async function cleans special characters from response."""
+        from reverse_api.utils import _generate_folder_name_async
+        from claude_agent_sdk import AssistantMessage, TextBlock
+
+        mock_text = MagicMock(spec=TextBlock)
+        mock_text.text = "my-cool/api (v2)"
+
+        mock_assistant = MagicMock(spec=AssistantMessage)
+        mock_assistant.content = [mock_text]
+
+        mock_client = AsyncMock()
+        mock_client.query = AsyncMock()
+
+        async def mock_receive():
+            yield mock_assistant
+
+        mock_client.receive_response = mock_receive
+
+        with patch("claude_agent_sdk.ClaudeSDKClient") as mock_sdk:
+            mock_sdk.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_sdk.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            result = await _generate_folder_name_async("my cool api")
+            assert result == "my_cool_api_v2"
+
+
+class TestGenerateFolderNameOpencodeAsync:
+    """Test _generate_folder_name_opencode_async function."""
+
+    @pytest.mark.asyncio
+    async def test_health_check_fails(self):
+        """Raises when OpenCode server not responding."""
+        from reverse_api.utils import _generate_folder_name_opencode_async
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=ConnectionError("refused"))
+
+        with patch("reverse_api.config.ConfigManager"):
+            with patch("reverse_api.utils.get_config_path"):
+                with patch("httpx.AsyncClient") as mock_async:
+                    mock_async.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+                    mock_async.return_value.__aexit__ = AsyncMock(return_value=False)
+
+                    with pytest.raises(Exception, match="not responding"):
+                        await _generate_folder_name_opencode_async("test prompt")
+
+    @pytest.mark.asyncio
+    async def test_creates_session_when_no_id(self):
+        """Creates a new session when session_id is None."""
+        from reverse_api.utils import _generate_folder_name_opencode_async
+
+        mock_health = AsyncMock()
+        mock_session_create = MagicMock()
+        mock_session_create.raise_for_status = MagicMock()
+        mock_session_create.json.return_value = {"id": "new_sess_123"}
+
+        mock_message_post = AsyncMock()
+
+        mock_messages_response = MagicMock()
+        mock_messages_response.status_code = 200
+        mock_messages_response.json.return_value = [
+            {
+                "info": {"role": "assistant"},
+                "parts": [{"type": "text", "text": "apple_jobs_api"}],
+            }
+        ]
+
+        call_idx = [0]
+
+        async def mock_get(path, **kwargs):
+            if path == "/global/health":
+                return MagicMock()
+            if "/message" in path:
+                return mock_messages_response
+            return MagicMock()
+
+        async def mock_post(path, **kwargs):
+            if path == "/session":
+                return mock_session_create
+            return MagicMock()
+
+        # Mock the stream context manager
+        mock_stream_response = AsyncMock()
+
+        async def mock_aiter_lines():
+            yield 'data: {"type":"session.idle","properties":{"sessionID":"new_sess_123"}}'
+
+        mock_stream_response.aiter_lines = mock_aiter_lines
+
+        mock_stream_cm = AsyncMock()
+        mock_stream_cm.__aenter__ = AsyncMock(return_value=mock_stream_response)
+        mock_stream_cm.__aexit__ = AsyncMock(return_value=False)
+
+        mock_client = AsyncMock()
+        mock_client.get = mock_get
+        mock_client.post = mock_post
+        mock_client.stream = MagicMock(return_value=mock_stream_cm)
+        mock_client.delete = AsyncMock()
+
+        with patch("reverse_api.config.ConfigManager") as mock_cm:
+            mock_cm.return_value.get.return_value = "anthropic"
+            with patch("reverse_api.utils.get_config_path"):
+                with patch("httpx.AsyncClient") as mock_async:
+                    mock_async.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+                    mock_async.return_value.__aexit__ = AsyncMock(return_value=False)
+
+                    result = await _generate_folder_name_opencode_async("Get Apple jobs")
+                    assert result == "apple_jobs_api"
+                    # Session should be cleaned up
+                    mock_client.delete.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_reuses_existing_session(self):
+        """Reuses session_id when provided."""
+        from reverse_api.utils import _generate_folder_name_opencode_async
+
+        mock_messages_response = MagicMock()
+        mock_messages_response.status_code = 200
+        mock_messages_response.json.return_value = [
+            {
+                "info": {"role": "assistant"},
+                "parts": [{"type": "text", "text": "test_api"}],
+            }
+        ]
+
+        async def mock_get(path, **kwargs):
+            if path == "/global/health":
+                return MagicMock()
+            if "/message" in path:
+                return mock_messages_response
+            return MagicMock()
+
+        async def mock_post(path, **kwargs):
+            return MagicMock()
+
+        mock_stream_response = AsyncMock()
+
+        async def mock_aiter_lines():
+            yield 'data: {"type":"session.idle","properties":{"sessionID":"existing_sess"}}'
+
+        mock_stream_response.aiter_lines = mock_aiter_lines
+
+        mock_stream_cm = AsyncMock()
+        mock_stream_cm.__aenter__ = AsyncMock(return_value=mock_stream_response)
+        mock_stream_cm.__aexit__ = AsyncMock(return_value=False)
+
+        mock_client = AsyncMock()
+        mock_client.get = mock_get
+        mock_client.post = mock_post
+        mock_client.stream = MagicMock(return_value=mock_stream_cm)
+        mock_client.delete = AsyncMock()
+
+        with patch("reverse_api.config.ConfigManager") as mock_cm:
+            mock_cm.return_value.get.return_value = "anthropic"
+            with patch("reverse_api.utils.get_config_path"):
+                with patch("httpx.AsyncClient") as mock_async:
+                    mock_async.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+                    mock_async.return_value.__aexit__ = AsyncMock(return_value=False)
+
+                    result = await _generate_folder_name_opencode_async("test", session_id="existing_sess")
+                    assert result == "test_api"
+                    # Should NOT delete session since we didn't create it
+                    mock_client.delete.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_no_assistant_messages_returns_slugified(self):
+        """Falls back to slugify when no assistant messages found."""
+        from reverse_api.utils import _generate_folder_name_opencode_async
+
+        mock_messages_response = MagicMock()
+        mock_messages_response.status_code = 200
+        mock_messages_response.json.return_value = []  # No messages
+
+        async def mock_get(path, **kwargs):
+            if path == "/global/health":
+                return MagicMock()
+            if "/message" in path:
+                return mock_messages_response
+            return MagicMock()
+
+        async def mock_post(path, **kwargs):
+            return MagicMock()
+
+        mock_stream_response = AsyncMock()
+
+        async def mock_aiter_lines():
+            yield 'data: {"type":"session.idle","properties":{"sessionID":"sess1"}}'
+
+        mock_stream_response.aiter_lines = mock_aiter_lines
+
+        mock_stream_cm = AsyncMock()
+        mock_stream_cm.__aenter__ = AsyncMock(return_value=mock_stream_response)
+        mock_stream_cm.__aexit__ = AsyncMock(return_value=False)
+
+        mock_client = AsyncMock()
+        mock_client.get = mock_get
+        mock_client.post = mock_post
+        mock_client.stream = MagicMock(return_value=mock_stream_cm)
+
+        with patch("reverse_api.config.ConfigManager") as mock_cm:
+            mock_cm.return_value.get.return_value = "anthropic"
+            with patch("reverse_api.utils.get_config_path"):
+                with patch("httpx.AsyncClient") as mock_async:
+                    mock_async.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+                    mock_async.return_value.__aexit__ = AsyncMock(return_value=False)
+
+                    result = await _generate_folder_name_opencode_async("test api", session_id="sess1")
+                    # Falls through to the final return
+                    assert result == "test_api"
+
+    @pytest.mark.asyncio
+    async def test_session_status_idle_event(self):
+        """Handles session.status with idle type."""
+        from reverse_api.utils import _generate_folder_name_opencode_async
+
+        mock_messages_response = MagicMock()
+        mock_messages_response.status_code = 200
+        mock_messages_response.json.return_value = [
+            {
+                "info": {"role": "assistant"},
+                "parts": [{"type": "text", "text": "data_api"}],
+            }
+        ]
+
+        async def mock_get(path, **kwargs):
+            if path == "/global/health":
+                return MagicMock()
+            if "/message" in path:
+                return mock_messages_response
+            return MagicMock()
+
+        async def mock_post(path, **kwargs):
+            return MagicMock()
+
+        mock_stream_response = AsyncMock()
+
+        async def mock_aiter_lines():
+            yield 'data: {"type":"session.status","properties":{"sessionID":"sess1","status":{"type":"idle"}}}'
+
+        mock_stream_response.aiter_lines = mock_aiter_lines
+
+        mock_stream_cm = AsyncMock()
+        mock_stream_cm.__aenter__ = AsyncMock(return_value=mock_stream_response)
+        mock_stream_cm.__aexit__ = AsyncMock(return_value=False)
+
+        mock_client = AsyncMock()
+        mock_client.get = mock_get
+        mock_client.post = mock_post
+        mock_client.stream = MagicMock(return_value=mock_stream_cm)
+
+        with patch("reverse_api.config.ConfigManager") as mock_cm:
+            mock_cm.return_value.get.return_value = "anthropic"
+            with patch("reverse_api.utils.get_config_path"):
+                with patch("httpx.AsyncClient") as mock_async:
+                    mock_async.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+                    mock_async.return_value.__aexit__ = AsyncMock(return_value=False)
+
+                    result = await _generate_folder_name_opencode_async("test", session_id="sess1")
+                    assert result == "data_api"
+
+
+class TestPathValidationExceptions:
+    """Test path traversal validation exception handling."""
+
+    def test_har_dir_resolve_oserror(self, tmp_path):
+        """get_har_dir raises ValueError on OSError during resolve."""
+        with patch("reverse_api.utils.get_base_output_dir", return_value=tmp_path):
+            with patch.object(Path, "resolve", side_effect=OSError("permission denied")):
+                with pytest.raises(ValueError, match="Invalid path"):
+                    get_har_dir("valid_id")
+
+    def test_scripts_dir_resolve_oserror(self, tmp_path):
+        """get_scripts_dir raises ValueError on OSError during resolve."""
+        from reverse_api.utils import get_scripts_dir
+        with patch("reverse_api.utils.get_base_output_dir", return_value=tmp_path):
+            with patch.object(Path, "resolve", side_effect=OSError("permission denied")):
+                with pytest.raises(ValueError, match="Invalid path"):
+                    get_scripts_dir("valid_id")
+
+    def test_docs_dir_resolve_oserror(self, tmp_path):
+        """get_docs_dir raises ValueError on OSError during resolve."""
+        with patch("reverse_api.utils.get_base_output_dir", return_value=tmp_path):
+            with patch.object(Path, "resolve", side_effect=OSError("permission denied")):
+                with pytest.raises(ValueError, match="Invalid path"):
+                    get_docs_dir("valid_id")
+
+    def test_har_dir_resolve_runtime_error(self, tmp_path):
+        """get_har_dir raises ValueError on RuntimeError during resolve."""
+        with patch("reverse_api.utils.get_base_output_dir", return_value=tmp_path):
+            with patch.object(Path, "resolve", side_effect=RuntimeError("symlink loop")):
+                with pytest.raises(ValueError, match="Invalid path"):
+                    get_har_dir("valid_id")

@@ -236,6 +236,199 @@ class TestCollectorAgentLoop:
                     result = await collector._agent_loop()
                     assert result == {"success": True}
 
+    @pytest.mark.asyncio
+    async def test_agent_loop_assistant_message_with_tools(self, tmp_path):
+        """Agent loop processes AssistantMessage with ToolUseBlock, ToolResultBlock, TextBlock."""
+        with patch("reverse_api.collector.MessageStore") as mock_ms:
+            with patch("reverse_api.collector.CollectorUI") as mock_ui_cls:
+                mock_ui = MagicMock()
+                mock_ui_cls.return_value = mock_ui
+
+                collector = Collector(
+                    run_id="test123",
+                    prompt="test",
+                    model="claude-sonnet-4-5",
+                )
+                collector._collected_dir = tmp_path
+                collector.items_path = tmp_path / "items.jsonl"
+
+                from claude_agent_sdk import (
+                    AssistantMessage,
+                    ResultMessage,
+                    TextBlock,
+                    ToolResultBlock,
+                    ToolUseBlock,
+                )
+
+                # Create an AssistantMessage with various block types
+                mock_tool_use = MagicMock(spec=ToolUseBlock)
+                mock_tool_use.name = "WebFetch"
+                mock_tool_use.input = {"url": "https://example.com"}
+
+                mock_tool_result = MagicMock(spec=ToolResultBlock)
+                mock_tool_result.is_error = False
+
+                mock_text = MagicMock(spec=TextBlock)
+                mock_text.text = "Analyzing data..."
+
+                mock_assistant = MagicMock(spec=AssistantMessage)
+                mock_assistant.content = [mock_tool_use, mock_tool_result, mock_text]
+                # No usage attribute
+                del mock_assistant.usage
+
+                mock_result = MagicMock(spec=ResultMessage)
+                mock_result.is_error = False
+                mock_result.result = "Done"
+
+                mock_client = AsyncMock()
+                mock_client.query = AsyncMock()
+
+                async def mock_receive():
+                    yield mock_assistant
+                    yield mock_result
+
+                mock_client.receive_response = mock_receive
+
+                with patch("reverse_api.collector.ClaudeSDKClient") as mock_sdk:
+                    mock_sdk.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+                    mock_sdk.return_value.__aexit__ = AsyncMock(return_value=False)
+
+                    result = await collector._agent_loop()
+                    assert result == {"success": True}
+                    mock_ui.tool_start.assert_called_once_with("WebFetch", {"url": "https://example.com"})
+                    mock_ui.tool_result.assert_called_once_with("WebFetch", False)
+                    mock_ui.thinking.assert_called_once_with("Analyzing data...")
+
+    @pytest.mark.asyncio
+    async def test_agent_loop_write_items_tracking(self, tmp_path):
+        """Agent loop tracks Write to items.jsonl."""
+        with patch("reverse_api.collector.MessageStore") as mock_ms:
+            with patch("reverse_api.collector.CollectorUI") as mock_ui_cls:
+                mock_ui = MagicMock()
+                mock_ui_cls.return_value = mock_ui
+
+                collector = Collector(
+                    run_id="test123",
+                    prompt="test",
+                    model="claude-sonnet-4-5",
+                )
+                collector._collected_dir = tmp_path
+                collector.items_path = tmp_path / "items.jsonl"
+
+                from claude_agent_sdk import AssistantMessage, ResultMessage, ToolUseBlock
+
+                mock_tool_use = MagicMock(spec=ToolUseBlock)
+                mock_tool_use.name = "Write"
+                mock_tool_use.input = {
+                    "file_path": "/tmp/items.jsonl",
+                    "content": '{"name": "Test Item"}',
+                }
+
+                mock_assistant = MagicMock(spec=AssistantMessage)
+                mock_assistant.content = [mock_tool_use]
+                del mock_assistant.usage
+
+                mock_result = MagicMock(spec=ResultMessage)
+                mock_result.is_error = False
+
+                mock_client = AsyncMock()
+                mock_client.query = AsyncMock()
+
+                async def mock_receive():
+                    yield mock_assistant
+                    yield mock_result
+
+                mock_client.receive_response = mock_receive
+
+                with patch("reverse_api.collector.ClaudeSDKClient") as mock_sdk:
+                    mock_sdk.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+                    mock_sdk.return_value.__aexit__ = AsyncMock(return_value=False)
+
+                    result = await collector._agent_loop()
+                    assert result == {"success": True}
+                    mock_ui.item_saved.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_agent_loop_usage_tracking(self, tmp_path):
+        """Agent loop accumulates usage metadata."""
+        with patch("reverse_api.collector.MessageStore") as mock_ms:
+            with patch("reverse_api.collector.CollectorUI") as mock_ui_cls:
+                mock_ui = MagicMock()
+                mock_ui_cls.return_value = mock_ui
+
+                collector = Collector(
+                    run_id="test123",
+                    prompt="test",
+                    model="claude-sonnet-4-5",
+                )
+                collector._collected_dir = tmp_path
+                collector.items_path = tmp_path / "items.jsonl"
+
+                from claude_agent_sdk import AssistantMessage, ResultMessage
+
+                mock_assistant = MagicMock(spec=AssistantMessage)
+                mock_assistant.content = []
+                mock_assistant.usage = {"input_tokens": 100, "output_tokens": 50}
+
+                mock_assistant2 = MagicMock(spec=AssistantMessage)
+                mock_assistant2.content = []
+                mock_assistant2.usage = {"input_tokens": 200, "output_tokens": 75}
+
+                mock_result = MagicMock(spec=ResultMessage)
+                mock_result.is_error = False
+
+                mock_client = AsyncMock()
+                mock_client.query = AsyncMock()
+
+                async def mock_receive():
+                    yield mock_assistant
+                    yield mock_assistant2
+                    yield mock_result
+
+                mock_client.receive_response = mock_receive
+
+                with patch("reverse_api.collector.ClaudeSDKClient") as mock_sdk:
+                    mock_sdk.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+                    mock_sdk.return_value.__aexit__ = AsyncMock(return_value=False)
+
+                    result = await collector._agent_loop()
+                    assert result == {"success": True}
+                    assert collector.usage_metadata["input_tokens"] == 300
+                    assert collector.usage_metadata["output_tokens"] == 125
+
+    @pytest.mark.asyncio
+    async def test_agent_loop_no_result_returns_success(self, tmp_path):
+        """Agent loop returns success when no ResultMessage (line 186)."""
+        with patch("reverse_api.collector.MessageStore") as mock_ms:
+            with patch("reverse_api.collector.CollectorUI") as mock_ui_cls:
+                mock_ui = MagicMock()
+                mock_ui_cls.return_value = mock_ui
+
+                collector = Collector(
+                    run_id="test123",
+                    prompt="test",
+                    model="claude-sonnet-4-5",
+                )
+                collector._collected_dir = tmp_path
+                collector.items_path = tmp_path / "items.jsonl"
+
+                mock_client = AsyncMock()
+                mock_client.query = AsyncMock()
+
+                async def mock_receive():
+                    # Yield nothing - empty stream
+                    return
+                    yield  # Make it an async generator
+
+                mock_client.receive_response = mock_receive
+
+                with patch("reverse_api.collector.ClaudeSDKClient") as mock_sdk:
+                    mock_sdk.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+                    mock_sdk.return_value.__aexit__ = AsyncMock(return_value=False)
+
+                    result = await collector._agent_loop()
+                    assert result == {"success": True}
+
 
 class TestCollectorExportCsv:
     """Test CSV export."""

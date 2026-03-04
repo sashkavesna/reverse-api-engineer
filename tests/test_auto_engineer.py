@@ -248,6 +248,150 @@ class TestClaudeAutoEngineerAnalyze:
             if result is not None:
                 assert "usage" in result
 
+    @pytest.mark.asyncio
+    async def test_assistant_message_with_tools(self, tmp_path):
+        """AssistantMessage with ToolUseBlock, ToolResultBlock, TextBlock are processed."""
+        eng = self._make_engineer(tmp_path)
+
+        from claude_agent_sdk import (
+            AssistantMessage,
+            ResultMessage,
+            TextBlock,
+            ToolResultBlock,
+            ToolUseBlock,
+        )
+
+        mock_tool_use = MagicMock(spec=ToolUseBlock)
+        mock_tool_use.name = "Read"
+        mock_tool_use.input = {"file_path": "/test.py"}
+
+        mock_tool_result = MagicMock(spec=ToolResultBlock)
+        mock_tool_result.is_error = False
+        mock_tool_result.content = "file contents"
+
+        mock_text = MagicMock(spec=TextBlock)
+        mock_text.text = "Analyzing the file..."
+
+        mock_assistant = MagicMock(spec=AssistantMessage)
+        mock_assistant.content = [mock_tool_use, mock_tool_result, mock_text]
+        del mock_assistant.usage
+
+        mock_result = MagicMock(spec=ResultMessage)
+        mock_result.is_error = False
+
+        mock_client = AsyncMock()
+        mock_client.query = AsyncMock()
+
+        async def mock_receive():
+            yield mock_assistant
+            yield mock_result
+
+        mock_client.receive_response = mock_receive
+
+        with patch("reverse_api.auto_engineer.ClaudeSDKClient") as mock_sdk:
+            mock_sdk.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_sdk.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            result = await eng.analyze_and_generate()
+            assert result is not None
+            assert "script_path" in result
+
+    @pytest.mark.asyncio
+    async def test_assistant_message_with_usage(self, tmp_path):
+        """AssistantMessage with usage metadata updates tracking."""
+        eng = self._make_engineer(tmp_path)
+
+        from claude_agent_sdk import AssistantMessage, ResultMessage
+
+        mock_assistant = MagicMock(spec=AssistantMessage)
+        mock_assistant.content = []
+        mock_assistant.usage = {"input_tokens": 500, "output_tokens": 200}
+
+        mock_result = MagicMock(spec=ResultMessage)
+        mock_result.is_error = False
+
+        mock_client = AsyncMock()
+        mock_client.query = AsyncMock()
+
+        async def mock_receive():
+            yield mock_assistant
+            yield mock_result
+
+        mock_client.receive_response = mock_receive
+
+        with patch("reverse_api.auto_engineer.ClaudeSDKClient") as mock_sdk:
+            mock_sdk.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_sdk.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            result = await eng.analyze_and_generate()
+            assert result is not None
+            assert eng.usage_metadata.get("input_tokens") == 500
+
+    @pytest.mark.asyncio
+    async def test_tool_result_with_result_attr(self, tmp_path):
+        """ToolResultBlock with result attribute (not content) is handled."""
+        eng = self._make_engineer(tmp_path)
+
+        from claude_agent_sdk import (
+            AssistantMessage,
+            ResultMessage,
+            ToolResultBlock,
+            ToolUseBlock,
+        )
+
+        mock_tool_use = MagicMock(spec=ToolUseBlock)
+        mock_tool_use.name = "Bash"
+        mock_tool_use.input = {"command": "ls"}
+
+        mock_tool_result = MagicMock(spec=ToolResultBlock)
+        mock_tool_result.is_error = True
+        del mock_tool_result.content
+        mock_tool_result.result = "command not found"
+
+        mock_assistant = MagicMock(spec=AssistantMessage)
+        mock_assistant.content = [mock_tool_use, mock_tool_result]
+        del mock_assistant.usage
+
+        mock_result = MagicMock(spec=ResultMessage)
+        mock_result.is_error = False
+
+        mock_client = AsyncMock()
+        mock_client.query = AsyncMock()
+
+        async def mock_receive():
+            yield mock_assistant
+            yield mock_result
+
+        mock_client.receive_response = mock_receive
+
+        with patch("reverse_api.auto_engineer.ClaudeSDKClient") as mock_sdk:
+            mock_sdk.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_sdk.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            result = await eng.analyze_and_generate()
+            assert result is not None
+
+    @pytest.mark.asyncio
+    async def test_no_result_message_returns_none(self, tmp_path):
+        """Empty stream with no ResultMessage returns None (line 365)."""
+        eng = self._make_engineer(tmp_path)
+
+        mock_client = AsyncMock()
+        mock_client.query = AsyncMock()
+
+        async def mock_receive():
+            return
+            yield
+
+        mock_client.receive_response = mock_receive
+
+        with patch("reverse_api.auto_engineer.ClaudeSDKClient") as mock_sdk:
+            mock_sdk.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_sdk.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            result = await eng.analyze_and_generate()
+            assert result is None
+
 
 class TestOpenCodeAutoEngineerInit:
     """Test OpenCodeAutoEngineer initialization."""
@@ -380,6 +524,105 @@ class TestOpenCodeAutoEngineerAnalyze:
 
         with patch("reverse_api.auto_engineer.httpx.AsyncClient") as mock_async:
             mock_async.return_value.__aenter__ = AsyncMock(side_effect=error)
+            mock_async.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            result = await eng.analyze_and_generate()
+            assert result is None
+
+    @pytest.mark.asyncio
+    async def test_health_check_401_with_custom_username(self, tmp_path):
+        """401 with custom username shows username in output."""
+        eng = self._make_engineer(tmp_path)
+        eng.opencode_username = "custom_user"
+
+        mock_response = MagicMock()
+        mock_response.status_code = 401
+        error = httpx.HTTPStatusError("401", request=MagicMock(), response=mock_response)
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=error)
+
+        with patch("reverse_api.auto_engineer.httpx.AsyncClient") as mock_async:
+            mock_async.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_async.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            result = await eng.analyze_and_generate()
+            assert result is None
+
+    @pytest.mark.asyncio
+    async def test_health_check_success_then_session_fail(self, tmp_path):
+        """Health check succeeds but session creation raises."""
+        eng = self._make_engineer(tmp_path)
+
+        mock_health = MagicMock()
+        mock_health.json.return_value = {"status": "ok"}
+        mock_health.raise_for_status = MagicMock()
+
+        mock_client = AsyncMock()
+
+        async def mock_get(path, **kwargs):
+            if path == "/global/health":
+                return mock_health
+            raise Exception("unexpected get")
+
+        mock_client.get = mock_get
+        mock_client.post = AsyncMock(side_effect=Exception("session creation failed"))
+
+        with patch("reverse_api.auto_engineer.httpx.AsyncClient") as mock_async:
+            mock_async.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_async.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            result = await eng.analyze_and_generate()
+            assert result is None
+
+    @pytest.mark.asyncio
+    async def test_health_check_general_exception(self, tmp_path):
+        """General exception on health check shows server not responding."""
+        eng = self._make_engineer(tmp_path)
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=ConnectionError("refused"))
+
+        with patch("reverse_api.auto_engineer.httpx.AsyncClient") as mock_async:
+            mock_async.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_async.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            result = await eng.analyze_and_generate()
+            assert result is None
+
+    @pytest.mark.asyncio
+    async def test_mcp_registration_failure(self, tmp_path):
+        """MCP server registration failure returns None."""
+        eng = self._make_engineer(tmp_path)
+
+        mock_health = MagicMock()
+        mock_health.json.return_value = {"status": "ok"}
+        mock_health.raise_for_status = MagicMock()
+
+        mock_session = MagicMock()
+        mock_session.json.return_value = {"id": "sess_123"}
+        mock_session.raise_for_status = MagicMock()
+
+        call_count = [0]
+
+        async def mock_get(path, **kwargs):
+            if path == "/global/health":
+                return mock_health
+            raise Exception("unexpected get")
+
+        async def mock_post(path, **kwargs):
+            if path == "/session":
+                return mock_session
+            if path == "/mcp":
+                raise Exception("MCP registration failed")
+            raise Exception(f"unexpected post to {path}")
+
+        mock_client = AsyncMock()
+        mock_client.get = mock_get
+        mock_client.post = mock_post
+
+        with patch("reverse_api.auto_engineer.httpx.AsyncClient") as mock_async:
+            mock_async.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_async.return_value.__aexit__ = AsyncMock(return_value=False)
 
             result = await eng.analyze_and_generate()
