@@ -372,6 +372,51 @@ class TestClaudeAutoEngineerAnalyze:
             assert result is not None
 
     @pytest.mark.asyncio
+    async def test_tool_result_with_output_attr(self, tmp_path):
+        """ToolResultBlock with output attribute (not content/result) is handled."""
+        eng = self._make_engineer(tmp_path)
+
+        from claude_agent_sdk import (
+            AssistantMessage,
+            ResultMessage,
+            ToolResultBlock,
+            ToolUseBlock,
+        )
+
+        mock_tool_use = MagicMock(spec=ToolUseBlock)
+        mock_tool_use.name = "Grep"
+        mock_tool_use.input = {"pattern": "test"}
+
+        mock_tool_result = MagicMock(spec=ToolResultBlock)
+        mock_tool_result.is_error = False
+        del mock_tool_result.content
+        del mock_tool_result.result
+        mock_tool_result.output = "grep output here"
+
+        mock_assistant = MagicMock(spec=AssistantMessage)
+        mock_assistant.content = [mock_tool_use, mock_tool_result]
+        del mock_assistant.usage
+
+        mock_result = MagicMock(spec=ResultMessage)
+        mock_result.is_error = False
+
+        mock_client = AsyncMock()
+        mock_client.query = AsyncMock()
+
+        async def mock_receive():
+            yield mock_assistant
+            yield mock_result
+
+        mock_client.receive_response = mock_receive
+
+        with patch("reverse_api.auto_engineer.ClaudeSDKClient") as mock_sdk:
+            mock_sdk.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_sdk.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            result = await eng.analyze_and_generate()
+            assert result is not None
+
+    @pytest.mark.asyncio
     async def test_no_result_message_returns_none(self, tmp_path):
         """Empty stream with no ResultMessage returns None (line 365)."""
         eng = self._make_engineer(tmp_path)
@@ -582,6 +627,131 @@ class TestOpenCodeAutoEngineerAnalyze:
 
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(side_effect=ConnectionError("refused"))
+
+        with patch("reverse_api.auto_engineer.httpx.AsyncClient") as mock_async:
+            mock_async.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_async.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            result = await eng.analyze_and_generate()
+            assert result is None
+
+    @pytest.mark.asyncio
+    async def test_full_success_flow(self, tmp_path):
+        """Full success flow with MCP registration, streaming, and result."""
+        eng = self._make_engineer(tmp_path)
+
+        mock_health = MagicMock()
+        mock_health.json.return_value = {"status": "ok"}
+        mock_health.raise_for_status = MagicMock()
+
+        mock_session = MagicMock()
+        mock_session.json.return_value = {"id": "sess_success"}
+        mock_session.raise_for_status = MagicMock()
+
+        mock_mcp = MagicMock()
+        mock_mcp.raise_for_status = MagicMock()
+
+        mock_prompt = MagicMock()
+        mock_prompt.raise_for_status = MagicMock()
+
+        mock_messages = MagicMock()
+        mock_messages.status_code = 200
+        mock_messages.json.return_value = [
+            {
+                "info": {"role": "assistant", "providerID": "anthropic", "modelID": "claude-opus-4-5"},
+                "parts": [{"type": "text", "text": "API client"}],
+            }
+        ]
+
+        async def mock_get(path, **kwargs):
+            if path == "/global/health":
+                return mock_health
+            if "/message" in path:
+                return mock_messages
+            return MagicMock()
+
+        post_calls = [0]
+
+        async def mock_post(path, **kwargs):
+            post_calls[0] += 1
+            if path == "/session":
+                return mock_session
+            if path == "/mcp":
+                return mock_mcp
+            return mock_prompt
+
+        mock_stream_resp = AsyncMock()
+
+        async def mock_aiter_lines():
+            yield 'data: {"type":"session.idle","properties":{"sessionID":"sess_success"}}'
+
+        mock_stream_resp.aiter_lines = mock_aiter_lines
+        mock_stream_cm = AsyncMock()
+        mock_stream_cm.__aenter__ = AsyncMock(return_value=mock_stream_resp)
+        mock_stream_cm.__aexit__ = AsyncMock(return_value=False)
+
+        mock_client = AsyncMock()
+        mock_client.get = mock_get
+        mock_client.post = mock_post
+        mock_client.stream = MagicMock(return_value=mock_stream_cm)
+        mock_client.delete = AsyncMock()
+
+        with patch("reverse_api.auto_engineer.httpx.AsyncClient") as mock_async:
+            mock_async.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_async.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            result = await eng.analyze_and_generate()
+            assert result is not None
+            assert "script_path" in result
+            assert result["session_id"] == "sess_success"
+
+    @pytest.mark.asyncio
+    async def test_http_401_outer_with_username(self, tmp_path):
+        """Outer 401 HTTPStatusError with custom username shows username."""
+        eng = self._make_engineer(tmp_path)
+        eng.opencode_username = "custom_user"
+
+        mock_health = MagicMock()
+        mock_health.json.return_value = {"status": "ok"}
+        mock_health.raise_for_status = MagicMock()
+
+        mock_session = MagicMock()
+        mock_session.json.return_value = {"id": "sess_auth"}
+        mock_session.raise_for_status = MagicMock()
+
+        mock_mcp = MagicMock()
+        mock_mcp.raise_for_status = MagicMock()
+
+        mock_response = MagicMock()
+        mock_response.status_code = 401
+
+        async def mock_get(path, **kwargs):
+            if path == "/global/health":
+                return mock_health
+            raise httpx.HTTPStatusError("401", request=MagicMock(), response=mock_response)
+
+        async def mock_post(path, **kwargs):
+            if path == "/session":
+                return mock_session
+            if path == "/mcp":
+                return mock_mcp
+            raise httpx.HTTPStatusError("401", request=MagicMock(), response=mock_response)
+
+        mock_stream_resp = AsyncMock()
+
+        async def mock_aiter_lines():
+            yield 'data: {"type":"session.idle","properties":{"sessionID":"sess_auth"}}'
+
+        mock_stream_resp.aiter_lines = mock_aiter_lines
+        mock_stream_cm = AsyncMock()
+        mock_stream_cm.__aenter__ = AsyncMock(return_value=mock_stream_resp)
+        mock_stream_cm.__aexit__ = AsyncMock(return_value=False)
+
+        mock_client = AsyncMock()
+        mock_client.get = mock_get
+        mock_client.post = mock_post
+        mock_client.stream = MagicMock(return_value=mock_stream_cm)
+        mock_client.delete = AsyncMock()
 
         with patch("reverse_api.auto_engineer.httpx.AsyncClient") as mock_async:
             mock_async.return_value.__aenter__ = AsyncMock(return_value=mock_client)

@@ -460,6 +460,52 @@ class TestInstallNativeHost:
             assert "Failed to install" in msg
 
 
+class TestFindPythonInterpreterSearchPaths:
+    """Test _find_python_interpreter with platform-specific search paths."""
+
+    def test_linux_search_path_found(self):
+        """Finds Python via Linux search paths."""
+        from reverse_api.native_host import _find_python_interpreter
+
+        call_count = [0]
+
+        def mock_check(path, min_version):
+            call_count[0] += 1
+            # Reject current interpreter, accept from search path
+            if "/usr/bin/python3.12" in path:
+                return True
+            return False
+
+        def mock_exists(self):
+            return "/usr/bin/python3.12" in str(self)
+
+        with patch("reverse_api.native_host.sys.executable", ""):
+            with patch("reverse_api.native_host.platform.system", return_value="Linux"):
+                with patch("reverse_api.native_host._check_python_version", side_effect=mock_check):
+                    with patch.object(Path, "exists", mock_exists):
+                        result = _find_python_interpreter()
+                        assert "python3.12" in result
+
+    def test_windows_search_path_logic(self):
+        """Windows search path uses .exe extensions."""
+        from reverse_api.native_host import _find_python_interpreter
+
+        def mock_check(path, min_version):
+            if "python3.12.exe" in path:
+                return True
+            return False
+
+        def mock_exists(self):
+            return "python3.12.exe" in str(self)
+
+        with patch("reverse_api.native_host.sys.executable", ""):
+            with patch("reverse_api.native_host.platform.system", return_value="Windows"):
+                with patch("reverse_api.native_host._check_python_version", side_effect=mock_check):
+                    with patch.object(Path, "exists", mock_exists):
+                        result = _find_python_interpreter()
+                        assert "python3.12" in result
+
+
 class TestNativeHostHandlerRunAsyncMethod:
     """Test _run_async method."""
 
