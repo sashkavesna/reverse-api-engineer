@@ -59,8 +59,8 @@ class SyncHandler(FileSystemEventHandler):
         if name.endswith(".tmp") or ".tmp." in name:
             return True
 
-        # Check for __pycache__ directories
-        if "__pycache__" in path.parts:
+        # Check for __pycache__ and node_modules directories
+        if "__pycache__" in path.parts or "node_modules" in path.parts:
             return True
 
         # Check for other common temporary patterns
@@ -253,6 +253,12 @@ class FileSyncWatcher:
         }
 
 
+def _should_skip_path(path: Path) -> bool:
+    """Check if a path should be skipped during sync (node_modules, __pycache__, etc.)."""
+    skip_dirs = {"node_modules", "__pycache__"}
+    return bool(skip_dirs & set(path.parts))
+
+
 def sync_directory_once(source_dir: Path, dest_dir: Path):
     """
     Perform a one-time sync of a directory.
@@ -269,7 +275,7 @@ def sync_directory_once(source_dir: Path, dest_dir: Path):
     final_dest_dir.mkdir(parents=True, exist_ok=True)
 
     for item in source_dir.rglob("*"):
-        if item.is_file():
+        if item.is_file() and not _should_skip_path(item):
             relative = item.relative_to(source_dir)
             dest = final_dest_dir / relative
             dest.parent.mkdir(parents=True, exist_ok=True)
