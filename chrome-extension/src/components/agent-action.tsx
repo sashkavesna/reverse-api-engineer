@@ -82,7 +82,7 @@ function DoneAction({ cost, durationMs, isError }: { cost?: number; durationMs?:
   if (durationMs) details.push(`Time: ${(durationMs / 1000).toFixed(1)}s`)
   
   return (
-    <div className={`py-3 border-y-2 border-border/30 my-6 ${isError ? 'text-primary' : 'text-green-500/90'}`}>
+    <div className={`py-3 my-6 ${isError ? 'text-primary' : 'text-green-500/90'}`}>
       <div className="text-[12px] font-semibold tracking-wide">{statusText}</div>
       {details.length > 0 && (
         <div className="text-[11px] text-text-secondary/80 mt-1.5 tracking-wide">
@@ -95,7 +95,7 @@ function DoneAction({ cost, durationMs, isError }: { cost?: number; durationMs?:
 
 function ErrorAction({ message }: { message: string }) {
   return (
-    <div className="bg-primary/10 border-l-2 border-primary/50 p-4 space-y-2">
+    <div className="bg-primary/5 p-4 space-y-2 rounded-lg">
       <div className="text-[12px] font-semibold text-primary tracking-wide uppercase">Critical Error</div>
       <div className="text-sm text-primary/90">{message}</div>
     </div>

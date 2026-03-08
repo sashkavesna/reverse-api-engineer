@@ -240,7 +240,7 @@ After your analysis, generate the files:
 
 7. **Handle bot detection**:
    - If you encounter bot detection, CAPTCHA, or anti-scraping measures with `requests`
-   - Consider switching to Playwright with CDP (Chrome DevTools Protocol)
+   - Consider switching to Playwright with CDP (Chrome DevTools Protocol) or using httpcloak
    - Use the real user browser context to bypass detection
    - Maintain the same code quality standards regardless of approach
 

@@ -6,7 +6,8 @@ import type { Settings, Session, ChatMessage, AppMode } from './types'
 
 const DEFAULT_SETTINGS: Settings = {
   captureTypes: ['xhr', 'fetch', 'websocket'],
-  lastModel: 'claude-sonnet-4-5'
+  lastModel: 'claude-sonnet-4-5',
+  saveLocation: 'downloads'  // Default to downloads folder
 }
 
 export async function getSettings(): Promise<Settings> {
@@ -148,4 +149,35 @@ export async function addChatMessage(runId: string, message: ChatMessage): Promi
   const history = await getChatHistory(runId)
   history.push(message)
   await chrome.storage.local.set({ [`chat_${runId}`]: history })
+}
+
+// Save location helpers for dual save system
+
+export async function getSaveLocation(): Promise<string> {
+  const settings = await getSettings()
+  return settings.saveLocation || 'downloads'
+}
+
+export async function setSaveLocation(location: string): Promise<void> {
+  await saveSettings({ saveLocation: location })
+}
+
+export async function isDownloadsDefault(): Promise<boolean> {
+  const location = await getSaveLocation()
+  return location === 'downloads'
+}
+
+export async function updateSessionDualSavePaths(
+  sessionId: string,
+  hiddenPath: string,
+  visiblePath: string,
+  visibleDirectory: string
+): Promise<void> {
+  const session = await getSession(sessionId)
+  if (session) {
+    session.codegenHiddenPath = hiddenPath
+    session.codegenVisiblePath = visiblePath
+    session.codegenVisibleDirectory = visibleDirectory
+    await saveSession(session)
+  }
 }

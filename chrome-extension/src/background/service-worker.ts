@@ -17,7 +17,9 @@ import {
   getActiveSessionId,
   setActiveSessionId,
   getAppMode,
-  setAppMode
+  setAppMode,
+  getSaveLocation,
+  updateSessionDualSavePaths
 } from '../shared/storage'
 import type { Session, AppMode } from '../shared/types'
 
@@ -72,7 +74,7 @@ function handleCaptureEvent(event: { type: string; request?: unknown }): void {
 }
 
 function broadcastMessage(message: Record<string, unknown>): void {
-  chrome.runtime.sendMessage(message).catch(() => {})
+  chrome.runtime.sendMessage(message).catch(() => { })
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -85,7 +87,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return true
 })
 
-async function handleMessage(message: { type: string; [key: string]: unknown }): Promise<unknown> {
+async function handleMessage(message: { type: string;[key: string]: unknown }): Promise<unknown> {
   switch (message.type) {
     case 'getState':
       return getState()
@@ -156,13 +158,28 @@ async function getState(): Promise<Record<string, unknown>> {
 async function createSession(name?: string): Promise<{ success: boolean; session: Session }> {
   const runId = generateRunId()
   const sessionId = `session_${Date.now()}`
+
+  // Get current tab info
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+  const url = tab?.url || ''
+  let domain = ''
+  try {
+    if (url) {
+      domain = new URL(url).hostname
+    }
+  } catch (e) {
+    console.error('Failed to parse URL:', e)
+  }
+
   const sessionName = name || `Session ${new Date().toLocaleString()}`
 
   const newSession: Session = {
     id: sessionId,
     runId,
     name: sessionName,
-    tabId: 0,
+    tabId: tab?.id || 0,
+    url,
+    domain,
     startTime: new Date().toISOString(),
     requestCount: 0,
     isActive: true,
@@ -184,9 +201,12 @@ async function createSession(name?: string): Promise<{ success: boolean; session
 }
 
 async function switchSession(sessionId: string): Promise<{ success: boolean; session: Session | null }> {
-  // Don't allow switching if capturing on current session
+  // Don't allow switching if capturing or recording codegen on current session
   if (captureManager.isCapturing()) {
     throw new Error('Cannot switch sessions while capturing. Stop capture first.')
+  }
+  if (codegenActive) {
+    throw new Error('Cannot switch sessions while recording codegen. Stop codegen first.')
   }
 
   const session = await getSession(sessionId)
@@ -278,7 +298,7 @@ def run():
   return { success: true }
 }
 
-async function stopCodegen(): Promise<{ success: boolean; script: string }> {
+async function stopCodegen(): Promise<{ success: boolean; script: string; savedPath?: string; visiblePath?: string; visibleDirectory?: string }> {
   if (!codegenActive) {
     throw new Error('Codegen not active')
   }
@@ -302,40 +322,116 @@ if __name__ == "__main__":
   codegenActive = false
   const finalScript = codegenScript
 
-  // Save to active session if exists
+  // Dual save: Hidden (ID-based) + Visible (domain-based)
+  let savedPath: string | undefined
+  let visiblePath: string | undefined
+  let visibleDirectory: string | undefined
+
   if (activeSessionId) {
     const session = await getSession(activeSessionId)
     if (session) {
       session.codegenScript = finalScript
+
+      // Try to save via native host with dual save
+      if (nativeHostConnected && session.runId) {
+        try {
+          // Get user's preferred save location
+          const saveLocation = await getSaveLocation()
+          const domain = session.domain
+
+          // Call native host with dual save enabled
+          const response = await nativeHost.saveCodegenScript(
+            session.runId,
+            finalScript,
+            'codegen_script.py',
+            saveLocation,
+            domain
+          )
+
+          if (response.success) {
+            // Hidden path (for history/sync)
+            savedPath = response.hidden_path
+            session.codegenSavedPath = savedPath
+
+            // Visible path (easy to find)
+            visiblePath = response.visible_path
+            visibleDirectory = response.visible_directory
+            session.codegenVisiblePath = visiblePath
+            session.codegenVisibleDirectory = visibleDirectory
+
+            // Update session with dual save paths
+            await updateSessionDualSavePaths(
+              activeSessionId,
+              response.hidden_path || '',
+              response.visible_path || '',
+              response.visible_directory || ''
+            )
+
+            console.log('Codegen script saved (dual save):')
+            console.log('  Hidden:', response.hidden_path)
+            console.log('  Visible:', response.visible_path)
+          } else if (response.error) {
+            console.error('Failed to save codegen script:', response.error)
+          }
+        } catch (error) {
+          console.error('Failed to save codegen script via native host:', error)
+        }
+      }
+
       await saveSession(session)
     }
   }
 
-  broadcastMessage({ type: 'codegenStopped', script: finalScript })
+  broadcastMessage({
+    type: 'codegenStopped',
+    script: finalScript,
+    savedPath,
+    visiblePath,
+    visibleDirectory
+  })
 
   codegenTabId = null
 
-  return { success: true, script: finalScript }
+  return { success: true, script: finalScript, savedPath, visiblePath, visibleDirectory }
+}
+
+// Escape string for Python code generation
+function escapePythonString(str: string): string {
+  return str
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+    .replace(/\t/g, '\\t')
 }
 
 // Listen for codegen events from content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'codegenAction' && codegenActive && sender.tab?.id === codegenTabId) {
-    const { action, selector, value, url } = message
+    const { action, selector, value, url, scrollX, scrollY, causedByClick } = message
     let code = ''
 
     switch (action) {
       case 'click':
-        code = `        page.click("${selector}")\n`
+        code = `        page.click("${escapePythonString(selector)}")\n`
         break
       case 'fill':
-        code = `        page.fill("${selector}", "${value}")\n`
+        code = `        page.fill("${escapePythonString(selector)}", "${escapePythonString(value)}")\n`
         break
       case 'navigate':
-        code = `        page.goto("${url}")\n`
+        if (causedByClick) {
+          // Navigation caused by click - add as comment
+          code = `        # Navigated to: ${escapePythonString(url)}\n`
+        } else {
+          // Independent navigation - add as action
+          code = `        page.goto("${escapePythonString(url)}")\n`
+        }
         break
       case 'select':
-        code = `        page.select_option("${selector}", "${value}")\n`
+        code = `        page.select_option("${escapePythonString(selector)}", "${escapePythonString(value)}")\n`
+        break
+      case 'scroll':
+        code = `        page.evaluate("window.scrollTo(${scrollX}, ${scrollY})")\n`
         break
     }
 
@@ -365,7 +461,6 @@ async function startCapture(tabId?: number): Promise<{ success: boolean; runId: 
   if (!activeSessionId) {
     const { session } = await createSession()
     activeSessionId = session.id
-    currentRunId = session.runId
   }
 
   currentRunId = generateRunId()

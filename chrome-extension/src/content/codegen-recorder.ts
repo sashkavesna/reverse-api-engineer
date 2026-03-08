@@ -2,10 +2,16 @@
  * Content script for recording user interactions for Playwright codegen
  */
 
+console.log('[Codegen Recorder] Content script loaded')
+
 let isRecording = false
 
 // Generate a robust CSS selector for an element
-function getSelector(element: Element): string {
+function getSelector(element: Element, depth: number = 0): string {
+  // Prevent infinite recursion
+  if (depth > 10) {
+    return element.tagName.toLowerCase()
+  }
   // Try data-testid first
   if (element.hasAttribute('data-testid')) {
     return `[data-testid="${element.getAttribute('data-testid')}"]`
@@ -44,12 +50,13 @@ function getSelector(element: Element): string {
   // Try placeholder for inputs
   if (element.hasAttribute('placeholder')) {
     const placeholder = element.getAttribute('placeholder')
-    return `[placeholder="${placeholder}"]`
+    return `[placeholder="${CSS.escape(placeholder || '')}"]`
   }
 
   // Try aria-label
   if (element.hasAttribute('aria-label')) {
-    return `[aria-label="${element.getAttribute('aria-label')}"]`
+    const ariaLabel = element.getAttribute('aria-label')
+    return `[aria-label="${CSS.escape(ariaLabel || '')}"]`
   }
 
   // Try text content for buttons and links
@@ -62,14 +69,12 @@ function getSelector(element: Element): string {
 
   // Fall back to tag + nth-child
   const parent = element.parentElement
-  if (parent) {
+  if (parent && parent.tagName !== 'BODY' && parent.tagName !== 'HTML') {
     const siblings = Array.from(parent.children)
     const index = siblings.indexOf(element) + 1
     const tag = element.tagName.toLowerCase()
-    const parentSelector = getSelector(parent)
-    if (parentSelector !== 'body') {
-      return `${parentSelector} > ${tag}:nth-child(${index})`
-    }
+    const parentSelector = getSelector(parent, depth + 1)
+    return `${parentSelector} > ${tag}:nth-child(${index})`
   }
 
   // Last resort: just the tag
@@ -101,6 +106,13 @@ function sendAction(action: string, data: Record<string, unknown>) {
 let lastInputElement: HTMLInputElement | HTMLTextAreaElement | null = null
 let inputTimeout: ReturnType<typeof setTimeout> | null = null
 
+// Track scroll events
+let lastScrollTime = 0
+let scrollTimeout: ReturnType<typeof setTimeout> | null = null
+
+// Track click events for navigation correlation
+let lastClickTime = 0
+
 function handleClick(event: MouseEvent) {
   if (!isRecording) return
 
@@ -121,6 +133,8 @@ function handleClick(event: MouseEvent) {
     return
   }
 
+  console.log('[Codegen] Click on:', selector, target)
+  lastClickTime = Date.now()
   sendAction('click', { selector })
 }
 
@@ -150,6 +164,7 @@ function commitPendingInput() {
   const value = escapeString(lastInputElement.value)
 
   if (value) {
+    console.log('[Codegen] Fill input:', selector, 'with value:', value)
     sendAction('fill', { selector, value })
   }
 
@@ -181,13 +196,39 @@ function handleKeyDown(event: KeyboardEvent) {
   }
 }
 
+function handleScroll(_event: Event) {
+  if (!isRecording) return
+
+  // Debounce scroll events (300ms)
+  if (scrollTimeout) {
+    clearTimeout(scrollTimeout)
+  }
+
+  scrollTimeout = setTimeout(() => {
+    const scrollX = window.scrollX
+    const scrollY = window.scrollY
+
+    console.log('[Codegen] Scroll detected:', { scrollX, scrollY })
+    sendAction('scroll', { scrollX, scrollY })
+    lastScrollTime = Date.now()
+  }, 300)
+}
+
 // Handle navigation
 let lastUrl = window.location.href
+let navigationInterval: ReturnType<typeof setInterval> | null = null
 function checkNavigation() {
   if (window.location.href !== lastUrl) {
-    lastUrl = window.location.href
+    const newUrl = window.location.href
+    const timeSinceClick = Date.now() - lastClickTime
+
+    // Mark navigation as click-caused if within 500ms of a click
+    const causedByClick = timeSinceClick < 500
+
+    console.log('[Codegen] Navigation detected:', lastUrl, '->', newUrl, causedByClick ? '(caused by click)' : '')
+    lastUrl = newUrl
     if (isRecording) {
-      sendAction('navigate', { url: lastUrl })
+      sendAction('navigate', { url: lastUrl, causedByClick })
     }
   }
 }
@@ -199,15 +240,19 @@ function startRecording() {
   isRecording = true
   lastUrl = window.location.href
 
+  // Send initial navigation
+  sendAction('navigate', { url: lastUrl })
+
   document.addEventListener('click', handleClick, true)
   document.addEventListener('input', handleInput, true)
   document.addEventListener('change', handleChange, true)
   document.addEventListener('keydown', handleKeyDown, true)
+  document.addEventListener('scroll', handleScroll, true)
 
   // Check for navigation periodically
-  setInterval(checkNavigation, 100)
+  navigationInterval = setInterval(checkNavigation, 100)
 
-  console.log('[Codegen] Recording started')
+  console.log('[Codegen] Recording started on:', lastUrl)
 }
 
 // Stop recording
@@ -221,6 +266,17 @@ function stopRecording() {
   document.removeEventListener('input', handleInput, true)
   document.removeEventListener('change', handleChange, true)
   document.removeEventListener('keydown', handleKeyDown, true)
+  document.removeEventListener('scroll', handleScroll, true)
+
+  if (scrollTimeout) {
+    clearTimeout(scrollTimeout)
+    scrollTimeout = null
+  }
+
+  if (navigationInterval) {
+    clearInterval(navigationInterval)
+    navigationInterval = null
+  }
 
   console.log('[Codegen] Recording stopped')
 }
@@ -238,10 +294,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 })
 
 // Check if we should be recording on load
-chrome.runtime.sendMessage({ type: 'getCodegenState' }).then(response => {
-  if (response?.codegenActive) {
-    startRecording()
-  }
-}).catch(() => {
-  // Extension not ready yet
-})
+function checkInitialState(retries = 3) {
+  chrome.runtime.sendMessage({ type: 'getCodegenState' }).then(response => {
+    if (response?.codegenActive) {
+      startRecording()
+    }
+  }).catch(() => {
+    if (retries > 0) {
+      setTimeout(() => checkInitialState(retries - 1), 500)
+    }
+  })
+}
+checkInitialState()

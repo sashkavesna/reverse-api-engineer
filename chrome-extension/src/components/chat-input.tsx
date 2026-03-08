@@ -1,5 +1,5 @@
-import { Button } from '@base-ui/react/button'
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
+import type { AppMode } from '../shared/types'
 
 interface ChatInputProps {
   value: string
@@ -7,10 +7,14 @@ interface ChatInputProps {
   onSend: (message: string) => void
   isStreaming: boolean
   placeholder: string
+  mode: AppMode
+  onModeChange?: (mode: AppMode) => void
+  modeDisabled?: boolean
 }
 
-export function ChatInput({ value, onChange, onSend, isStreaming, placeholder }: ChatInputProps) {
+export function ChatInput({ value, onChange, onSend, isStreaming, placeholder, mode }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [isFocused, setIsFocused] = useState(false)
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -22,55 +26,118 @@ export function ChatInput({ value, onChange, onSend, isStreaming, placeholder }:
   const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      if (value.trim()) {
+      if (value.trim() && !isStreaming) {
         onSend(value.trim())
       }
     }
   }
 
   const handleSend = () => {
-    if (value.trim()) {
+    if (value.trim() && !isStreaming) {
       onSend(value.trim())
     }
   }
 
+  const handleContainerClick = () => {
+    textareaRef.current?.focus()
+  }
+
+  const hasContent = value.trim().length > 0
+
   return (
-    <div className="p-4">
-      <div className="flex items-start gap-3 w-full">
-        <span className="text-primary font-bold mt-1 select-none flex-shrink-0">{'>'}</span>
-        <textarea
-          ref={textareaRef}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={handleKeyPress}
-          placeholder={placeholder}
-          rows={1}
-          className="flex-1 bg-transparent border-none text-sm text-white placeholder:text-text-secondary/50 resize-none focus:outline-none focus:ring-0 p-1 min-h-[28px] max-h-[200px] leading-relaxed w-full"
-        />
-        {value.trim() && (
-          <Button
-            onClick={handleSend}
-            className="text-primary hover:text-white transition-colors p-1.5 flex-shrink-0"
-            title="Send message"
-          >
-            <SendIcon />
-          </Button>
-        )}
+    <div className="p-3">
+      <div
+        onClick={handleContainerClick}
+        className={`
+          flex min-h-[120px] flex-col rounded-3xl cursor-text
+          bg-card transition-all duration-200
+          border ${isFocused ? 'border-capture ring-1 ring-capture/30' : 'border-capture/30'}
+        `}
+      >
+        {/* Textarea Area */}
+        <div className="flex-1 relative overflow-y-auto max-h-[258px]">
+          <textarea
+            ref={textareaRef}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={handleKeyPress}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            placeholder={placeholder}
+            disabled={isStreaming}
+            aria-label="Chat message input"
+            className="
+              w-full border-0 p-3
+              bg-transparent text-[16px] text-foreground
+              placeholder:text-muted-foreground
+              resize-none shadow-none outline-none
+              min-h-[48.4px] leading-relaxed
+              whitespace-pre-wrap break-words
+              disabled:cursor-not-allowed disabled:opacity-50
+              transition-[padding] duration-200 ease-in-out
+            "
+          />
+        </div>
+
+        {/* Bottom Toolbar */}
+        <div className="flex min-h-[40px] items-center gap-2 p-2 pb-1 justify-end">
+          {/* Right Side Actions */}
+          <div className="flex items-center gap-2">
+            {/* Send Button */}
+            <button
+              type="button"
+              onClick={handleSend}
+              disabled={!hasContent || isStreaming}
+              aria-label="Send message"
+              className={`
+                inline-flex items-center justify-center
+                h-8 w-8 rounded-full cursor-pointer
+                transition-all duration-150
+                outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background
+                ${hasContent && !isStreaming
+                  ? mode === 'capture'
+                    ? 'bg-capture text-white hover:opacity-90 focus-visible:ring-capture/50'
+                    : 'bg-codegen text-white hover:opacity-90 focus-visible:ring-codegen/50'
+                  : 'bg-muted text-muted-foreground cursor-not-allowed opacity-50'
+                }
+              `}
+            >
+              <ArrowUpIcon className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
       </div>
+
       {isStreaming && (
-        <div className="mt-3 ml-6 flex items-center gap-2">
-          <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
-          <span className="text-[11px] text-text-secondary/80 tracking-wide">Processing...</span>
+        <div className="mt-2 flex items-center gap-2 px-1">
+          <div
+            className={`w-1.5 h-1.5 rounded-full animate-pulse ${mode === 'capture' ? 'bg-capture' : 'bg-codegen'
+              }`}
+          />
+          <span className="text-caption text-muted-foreground">Processing...</span>
         </div>
       )}
     </div>
   )
 }
 
-function SendIcon() {
+function ArrowUpIcon({ className }: { className?: string }) {
   return (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M12 5l0 14"></path>
+      <path d="M18 11l-6 -6"></path>
+      <path d="M6 11l6 -6"></path>
     </svg>
   )
 }

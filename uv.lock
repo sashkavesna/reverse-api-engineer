@@ -1995,7 +1995,7 @@ wheels = [
 
 [[package]]
 name = "reverse-api-engineer"
-version = "0.3.0"
+version = "0.3.2"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -2009,6 +2009,7 @@ dependencies = [
     { name = "requests" },
     { name = "rich" },
     { name = "setproctitle" },
+    { name = "sprites-py" },
     { name = "watchdog" },
 ]
 
@@ -2046,6 +2047,7 @@ requires-dist = [
     { name = "requests", specifier = ">=2.32.5" },
     { name = "rich", specifier = ">=13.0.0" },
     { name = "setproctitle", specifier = ">=1.3.0" },
+    { name = "sprites-py", specifier = ">=0.0.1a1" },
     { name = "stagehand", marker = "extra == 'agent'" },
     { name = "watchdog", specifier = ">=3.0.0" },
 ]
@@ -2321,6 +2323,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/89/23/adf3796d740536d63a6fbda113d07e60c734b6ed5d3058d1e47fc0495e47/soupsieve-2.8.1.tar.gz", hash = "sha256:4cf733bc50fa805f5df4b8ef4740fc0e0fa6218cf3006269afd3f9d6d80fd350", size = 117856, upload-time = "2025-12-18T13:50:34.655Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/48/f3/b67d6ea49ca9154453b6d70b34ea22f3996b9fa55da105a79d8732227adc/soupsieve-2.8.1-py3-none-any.whl", hash = "sha256:a11fe2a6f3d76ab3cf2de04eb339c1be5b506a8a47f2ceb6d139803177f85434", size = 36710, upload-time = "2025-12-18T13:50:33.267Z" },
+]
+
+[[package]]
+name = "sprites-py"
+version = "0.0.1a1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+    { name = "websockets" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0b/6c/6bace1ef983c6bb3466416030a88e465d4170522bca5fe9f24709cd99ec1/sprites_py-0.0.1a1.tar.gz", hash = "sha256:b90168a1eaf98d8d550b2d9b674067e388e3b6c2db5bc4ccfa457f4922c04d73", size = 24269, upload-time = "2026-01-10T06:26:38.7Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/67/47/36e48387e976529e2c92663c3912c3d658f973009dc4a1bf19309ffd441a/sprites_py-0.0.1a1-py3-none-any.whl", hash = "sha256:9568ee1001d1b489985413aed1041f0aa4dbf433b8194eb540aa16e6867a96ac", size = 29610, upload-time = "2026-01-10T06:26:37.19Z" },
 ]
 
 [[package]]

@@ -8,26 +8,29 @@ interface ModeSelectorProps {
 
 export function ModeSelector({ mode, onModeChange, disabled }: ModeSelectorProps) {
   return (
-    <div className="flex items-center bg-white/5 rounded border border-white/10 p-0.5">
+    <div className="flex items-center justify-center gap-1">
       <button
         onClick={() => onModeChange('capture')}
         disabled={disabled}
-        className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded transition-all ${
+        className={`px-3 py-1 text-[16px] leading-relaxed font-normal rounded-md transition-all duration-150 cursor-pointer ${
           mode === 'capture'
-            ? 'bg-primary/20 text-primary'
-            : 'text-white/50 hover:text-white/80 hover:bg-white/5'
+            ? 'text-capture'
+            : 'text-white/50 hover:text-white/80'
         } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+        aria-label="Switch to Capture mode"
       >
         Capture
       </button>
+      <div className="w-px h-3 bg-border" />
       <button
         onClick={() => onModeChange('codegen')}
         disabled={disabled}
-        className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded transition-all ${
+        className={`px-3 py-1 text-[16px] leading-relaxed font-normal rounded-md transition-all duration-150 cursor-pointer ${
           mode === 'codegen'
-            ? 'bg-primary/20 text-primary'
-            : 'text-white/50 hover:text-white/80 hover:bg-white/5'
+            ? 'text-codegen'
+            : 'text-white/50 hover:text-white/80'
         } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+        aria-label="Switch to Codegen mode"
       >
         Codegen
       </button>

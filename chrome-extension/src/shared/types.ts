@@ -3,12 +3,19 @@ export interface Session {
   runId: string
   name: string
   tabId: number
+  url?: string
+  domain?: string
   startTime: string
   endTime?: string
   requestCount: number
   isActive: boolean
   messages: ChatMessage[]
   codegenScript?: string
+  codegenSavedPath?: string
+  // Dual save paths
+  codegenHiddenPath?: string
+  codegenVisiblePath?: string
+  codegenVisibleDirectory?: string
 }
 
 export interface ChatMessage {
@@ -49,6 +56,17 @@ export interface AgentEvent {
 export interface Settings {
   lastModel: string
   captureTypes: string[]
+  saveLocation: 'downloads' | string  // 'downloads' or custom path
+}
+
+export interface SaveCodegenResult {
+  success: boolean
+  hidden_path?: string
+  visible_path?: string
+  hidden_directory?: string
+  visible_directory?: string
+  domain?: string
+  error?: string
 }
 
 export type MessageType =

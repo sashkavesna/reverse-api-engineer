@@ -1,6 +1,7 @@
 """Utility functions for run ID generation and path management."""
 
 import asyncio
+import platform
 import re
 import uuid
 from datetime import datetime
@@ -433,9 +434,7 @@ def get_har_dir(run_id: str, output_dir: str | None = None) -> Path:
     # Allow alphanumeric characters, hyphens, and underscores
     # Chrome extension IDs start with crx- followed by UUID-style format
     if not re.match(r"^[a-zA-Z0-9_-]+$", run_id):
-        raise ValueError(
-            f"Invalid run_id: {run_id}. Only alphanumeric characters, hyphens, and underscores are allowed"
-        )
+        raise ValueError(f"Invalid run_id: {run_id}. Only alphanumeric characters, hyphens, and underscores are allowed")
 
     # Limit length to prevent extremely long paths
     if len(run_id) > 64:
@@ -483,9 +482,7 @@ def get_scripts_dir(run_id: str, output_dir: str | None = None) -> Path:
     # Allow alphanumeric characters, hyphens, and underscores
     # Chrome extension IDs start with crx- followed by UUID-style format
     if not re.match(r"^[a-zA-Z0-9_-]+$", run_id):
-        raise ValueError(
-            f"Invalid run_id: {run_id}. Only alphanumeric characters, hyphens, and underscores are allowed"
-        )
+        raise ValueError(f"Invalid run_id: {run_id}. Only alphanumeric characters, hyphens, and underscores are allowed")
 
     # Limit length to prevent extremely long paths
     if len(run_id) > 64:
@@ -527,9 +524,7 @@ def get_docs_dir(run_id: str, output_dir: str | None = None) -> Path:
     # Allow alphanumeric characters, hyphens, and underscores
     # Chrome extension IDs start with crx- followed by UUID-style format
     if not re.match(r"^[a-zA-Z0-9_-]+$", run_id):
-        raise ValueError(
-            f"Invalid run_id: {run_id}. Only alphanumeric characters, hyphens, and underscores are allowed"
-        )
+        raise ValueError(f"Invalid run_id: {run_id}. Only alphanumeric characters, hyphens, and underscores are allowed")
 
     # Limit length to prevent extremely long paths
     if len(run_id) > 64:
@@ -576,3 +571,127 @@ def get_collected_dir(folder_name: str) -> Path:
     path = Path.cwd() / "collected" / folder_name
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def get_downloads_dir() -> Path:
+    """Get the user's Downloads folder path (cross-platform).
+
+    Returns:
+        Path to the Downloads directory
+    """
+    system = platform.system()
+    home = Path.home()
+
+    if system == "Windows":
+        # Windows: Use USERPROFILE environment variable
+        import os
+
+        user_profile = os.environ.get("USERPROFILE", str(home))
+        downloads = Path(user_profile) / "Downloads"
+    elif system == "Darwin":  # macOS
+        downloads = home / "Downloads"
+    else:  # Linux and others
+        downloads = home / "Downloads"
+
+    # Fallback to home/Downloads if the standard location doesn't exist
+    if not downloads.exists():
+        downloads = home / "Downloads"
+
+    downloads.mkdir(parents=True, exist_ok=True)
+    return downloads
+
+
+def sanitize_domain(domain: str) -> str:
+    """Clean domain name for use in folder names.
+
+    Args:
+        domain: Raw domain (e.g., "api.github.com", "www.example.com")
+
+    Returns:
+        Clean domain string (e.g., "api_github_com", "example_com")
+    """
+    # Remove www. prefix
+    domain = re.sub(r"^www\.", "", domain)
+    # Remove common TLDs for cleaner names
+    domain = re.sub(r"\.(com|org|net|io|co|app|dev)$", "", domain)
+    # Replace dots and other invalid chars with underscores
+    domain = re.sub(r"[^a-zA-Z0-9]", "_", domain)
+    # Collapse multiple underscores
+    domain = re.sub(r"_+", "_", domain)
+    # Strip leading/trailing underscores
+    domain = domain.strip("_")
+    return domain.lower()[:50]  # Limit length
+
+
+def get_visible_save_path(domain: str, base_dir: Path | str, suffix: int = 0) -> Path:
+    """Generate a visible save path with unique naming.
+
+    Creates folder names like: rae_github_com_2025-02-02
+    If folder exists and has content, appends _1, _2, etc.
+
+    Args:
+        domain: Domain name (will be sanitized)
+        base_dir: Base directory (e.g., Downloads or custom path)
+        suffix: Current suffix number for recursion (start with 0)
+
+    Returns:
+        Path object ready for use (directory created)
+    """
+    if isinstance(base_dir, str):
+        base_dir = Path(base_dir)
+
+    # Sanitize domain
+    clean_domain = sanitize_domain(domain)
+    if not clean_domain:
+        clean_domain = "unknown"
+
+    # Get current date
+    date_str = datetime.now().strftime("%Y-%m-%d")
+
+    # Build folder name
+    suffix_str = f"_{suffix}" if suffix > 0 else ""
+    folder_name = f"rae_{clean_domain}_{date_str}{suffix_str}"
+
+    # Build full path
+    path = base_dir / folder_name
+
+    # Check if exists and has content (non-empty)
+    if path.exists() and any(path.iterdir()):
+        # Recursively try next suffix
+        return get_visible_save_path(domain, base_dir, suffix + 1)
+
+    # Create directory
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def extract_domain_from_har(har_path: Path) -> str | None:
+    """Extract the primary domain from a HAR file.
+
+    Args:
+        har_path: Path to the HAR file
+
+    Returns:
+        Domain string or None if extraction fails
+    """
+    try:
+        import json
+
+        with open(har_path) as f:
+            har_data = json.load(f)
+
+        entries = har_data.get("log", {}).get("entries", [])
+        if not entries:
+            return None
+
+        # Get domain from first entry's URL
+        first_url = entries[0].get("request", {}).get("url", "")
+        if first_url:
+            from urllib.parse import urlparse
+
+            parsed = urlparse(first_url)
+            return parsed.netloc
+
+        return None
+    except Exception:
+        return None

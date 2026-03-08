@@ -86,6 +86,18 @@ class OpenCodeUI:
         """Build the current display state."""
         display = Text()
 
+        # Show current text (LLM output/thinking) - last few lines
+        if self._current_text:
+            # Show last portion of text to keep display manageable
+            lines = self._current_text.strip().split("\n")
+            # Show last 8 lines
+            display_lines = lines[-8:] if len(lines) > 8 else lines
+            for line in display_lines:
+                # Truncate long lines
+                if len(line) > 100:
+                    line = line[:97] + "..."
+                display.append(f"  {line}\n", style=THEME_DIM)
+
         # Show current tool if running
         if self._current_tool and self._tool_status == "running":
             display.append("  ⟳ ", style=THEME_PRIMARY)
@@ -341,8 +353,9 @@ class OpenCodeUI:
         self.console.print(f"  [dim]⟳ sync: active → {dest_dir}[/dim]")
 
     def sync_flash(self, message: str) -> None:
-        """Display a brief sync notification."""
-        self.console.print(f"  [dim]✓ {message}[/dim]")
+        """Display a brief sync notification (silenced to reduce noise)."""
+        # Silenced - too noisy when many files sync
+        pass
 
     def sync_error(self, message: str) -> None:
         """Display a sync error."""

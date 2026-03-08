@@ -1,12 +1,36 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   body {
-    @apply bg-background text-text-primary text-sm;
+    @apply bg-background text-text-primary text-base font-sans antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading;
+  }
+
+  /* System font optimization */
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Enhanced rendering for small text */
+  .text-tiny,
+  .text-caption,
+  .text-small {
+    text-rendering: geometricPrecision;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Optimize monospace rendering */
+  .font-mono,
+  .font-heading {
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "liga" 0;
   }
 }
 
@@ -20,7 +44,7 @@
   }
   
   .btn-secondary {
-    @apply border border-border text-text-primary hover:bg-background-secondary;
+    @apply border-0 text-text-primary hover:bg-background-secondary;
   }
   
   .btn-ghost {
@@ -28,9 +52,9 @@
   }
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar - ultra dark */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -38,17 +62,17 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2a2a2a;
-  border-radius: 4px;
+  background: #1a1a1a;
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3a3a3a;
+  background: #222222;
 }
 
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #2a2a2a transparent;
+  scrollbar-color: #1a1a1a transparent;
 }
 
 /* Animations */
@@ -88,9 +112,27 @@
   font-size: 0.875rem;
 }
 
-/* Smooth transitions */
-* {
-  transition-property: color, background-color, border-color, opacity;
+/* Smooth transitions - scoped to interactive elements to avoid text rendering issues */
+button,
+a,
+input,
+textarea,
+select,
+[role="button"],
+[role="tab"],
+.btn {
+  transition-property: color, background-color, border-color, opacity, transform;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -154,6 +154,46 @@ class NativeHostClient {
     })
   }
 
+  async saveCodegenScript(
+    runId: string,
+    script: string,
+    filename: string = 'codegen_script.py',
+    saveLocation: string = 'downloads',
+    domain?: string
+  ): Promise<{
+    success: boolean
+    hidden_path?: string
+    visible_path?: string
+    hidden_directory?: string
+    visible_directory?: string
+    domain?: string
+    error?: string
+  }> {
+    return new Promise((resolve) => {
+      this.sendMessage(
+        {
+          type: 'saveCodegenScript',
+          run_id: runId,
+          script,
+          filename,
+          save_location: saveLocation,
+          domain
+        },
+        (response) => {
+          resolve(response as {
+            success: boolean
+            hidden_path?: string
+            visible_path?: string
+            hidden_directory?: string
+            visible_directory?: string
+            domain?: string
+            error?: string
+          })
+        }
+      )
+    })
+  }
+
   isConnected(): boolean {
     return this.connected && this.port !== null
   }

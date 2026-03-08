@@ -101,24 +101,24 @@ export function SessionSelector({
     <div className="relative" ref={dropdownRef}>
       <Button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-white/80 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded transition-all"
+        className="flex items-center gap-2 px-3 py-1.5 text-[16px] leading-relaxed font-normal text-text-primary hover:text-white bg-muted hover:bg-muted/80 rounded-lg transition-all"
       >
         <FolderIcon />
-        <span className="truncate max-w-[120px]">
+        <span className="truncate max-w-[150px]">
           {activeSession?.name || 'No Session'}
         </span>
         <ChevronIcon isOpen={isOpen} />
       </Button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-72 bg-[#141414] border border-white/10 rounded shadow-xl z-50 overflow-hidden">
+        <div className="absolute top-full left-0 mt-1 w-72 bg-background-secondary rounded-xl shadow-2xl border border-border z-[100] overflow-hidden">
           {/* Header */}
-          <div className="px-3 py-2 border-b border-white/10 bg-white/5">
+          <div className="px-3 py-2 bg-muted">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider">Sessions</span>
+              <span className="text-[14px] leading-relaxed font-normal text-white/50 uppercase tracking-wider">Sessions</span>
               <Button
                 onClick={handleCreateSession}
-                className="text-[10px] text-primary hover:text-primary/80 font-medium transition-colors"
+                className="text-[14px] leading-relaxed text-primary hover:text-primary/80 font-normal transition-colors"
               >
                 + New
               </Button>
@@ -127,7 +127,7 @@ export function SessionSelector({
 
           {/* New session input */}
           {showNewInput && (
-            <div className="px-3 py-2 border-b border-white/10 bg-primary/5">
+            <div className="px-3 py-2 bg-primary/5">
               <input
                 ref={inputRef}
                 type="text"
@@ -135,7 +135,7 @@ export function SessionSelector({
                 onChange={(e) => setNewSessionName(e.target.value)}
                 onKeyDown={handleNewSessionKeyDown}
                 placeholder="Session name..."
-                className="w-full bg-transparent text-xs text-white placeholder:text-white/30 border-none outline-none"
+                className="w-full bg-transparent text-[14px] leading-relaxed font-normal text-white placeholder:text-white/30 border-none outline-none"
               />
             </div>
           )}
@@ -143,16 +143,14 @@ export function SessionSelector({
           {/* Session list */}
           <div className="max-h-64 overflow-y-auto">
             {sessions.length === 0 ? (
-              <div className="px-3 py-4 text-center text-[11px] text-white/30">
+              <div className="px-3 py-4 text-center text-[14px] leading-relaxed text-white/30">
                 No sessions yet
               </div>
             ) : (
               sessions.map(session => (
                 <div
                   key={session.id}
-                  className={`group flex items-center gap-2 px-3 py-2 hover:bg-white/5 cursor-pointer transition-colors ${
-                    session.id === activeSessionId ? 'bg-primary/10 border-l-2 border-primary' : ''
-                  }`}
+                  className="group flex items-center gap-2 px-3 py-2 hover:bg-white/5 cursor-pointer transition-colors"
                   onClick={() => {
                     if (!editingId && session.id !== activeSessionId) {
                       onSwitchSession(session.id)
@@ -168,18 +166,18 @@ export function SessionSelector({
                       onChange={(e) => setEditName(e.target.value)}
                       onKeyDown={(e) => handleRenameKeyDown(e, session.id)}
                       onClick={(e) => e.stopPropagation()}
-                      className="flex-1 bg-transparent text-xs text-white border border-primary/50 rounded px-1 py-0.5 outline-none"
+                      className="flex-1 bg-background text-[14px] leading-relaxed font-normal text-white rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-ring/50"
                     />
                   ) : (
                     <>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-white truncate">{session.name}</span>
+                          <span className="text-[14px] leading-relaxed font-normal text-white truncate">{session.name}</span>
                           {session.isActive && (
                             <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
                           )}
                         </div>
-                        <div className="flex items-center gap-2 text-[10px] text-white/40">
+                        <div className="flex items-center gap-2 text-[12px] leading-relaxed font-normal text-white/40">
                           <span>{formatDate(session.startTime)}</span>
                           <span>•</span>
                           <span>{session.requestCount} requests</span>
@@ -220,8 +218,8 @@ export function SessionSelector({
 
           {/* Footer with warning if capturing */}
           {isCapturing && (
-            <div className="px-3 py-2 border-t border-white/10 bg-yellow-500/10">
-              <span className="text-[10px] text-yellow-500/80">
+            <div className="px-3 py-2 bg-yellow-500/5">
+              <span className="text-[14px] leading-relaxed font-normal text-yellow-500/80">
                 Stop capture to switch sessions
               </span>
             </div>

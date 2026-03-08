@@ -5,7 +5,8 @@ import { AgentAction } from '../components/agent-action'
 import { ChatInput } from '../components/chat-input'
 import { SessionSelector } from '../components/session-selector'
 import { ModeSelector } from '../components/mode-selector'
-import { CodeDisplay } from '../components/code-display'
+import { CodeBlock } from '../components/ui/code-block'
+import { PlayIcon, StopIcon, Tick02Icon } from '../components/icons'
 import type { AppState, AgentEvent, Settings, Session, AppMode } from '../shared/types'
 
 interface ChatMessage {
@@ -38,6 +39,7 @@ const DEFAULT_STATE: ExtendedAppState = {
 const DEFAULT_SETTINGS: Settings = {
   lastModel: 'claude-sonnet-4-5',
   captureTypes: ['xhr', 'fetch', 'websocket'],
+  saveLocation: 'downloads'
 }
 
 export function SidePanel() {
@@ -46,6 +48,10 @@ export function SidePanel() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [inputValue, setInputValue] = useState('')
   const [warningMessage, setWarningMessage] = useState<string | null>(null)
+  const [codegenSavedPath, setCodegenSavedPath] = useState<string | null>(null)
+  const [codegenVisiblePath, setCodegenVisiblePath] = useState<string | null>(null)
+  const [codegenVisibleDirectory, setCodegenVisibleDirectory] = useState<string | null>(null)
+  const [showSettings, setShowSettings] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const currentResponseIdRef = useRef<string | null>(null)
@@ -63,7 +69,19 @@ export function SidePanel() {
           chrome.runtime.sendMessage({ type: 'getState' }),
           chrome.runtime.sendMessage({ type: 'getSettings' }),
         ])
-        if (stateRes) setState(prev => ({ ...prev, ...stateRes }))
+        if (stateRes) {
+          setState(prev => ({ ...prev, ...stateRes }))
+
+          // Load active session's data including messages and codegen info
+          const sessions = stateRes.sessions as Session[] | undefined
+          const activeSession = sessions?.find(s => s.id === stateRes.activeSessionId)
+          if (activeSession) {
+            setMessages(activeSession.messages || [])
+            setCodegenSavedPath(activeSession.codegenSavedPath || null)
+            setCodegenVisiblePath(activeSession.codegenVisiblePath || null)
+            setCodegenVisibleDirectory(activeSession.codegenVisibleDirectory || null)
+          }
+        }
         if (settingsRes) setSettings(prev => ({ ...prev, ...settingsRes }))
       } catch (err) {
         console.error('Failed to initialize:', err)
@@ -81,7 +99,7 @@ export function SidePanel() {
 
   // Listen for messages from background
   useEffect(() => {
-    const handleMessage = (message: { type: string; event?: AgentEvent | { type: string }; script?: string; session?: Session; mode?: AppMode; newCode?: string }) => {
+    const handleMessage = (message: { type: string; event?: AgentEvent | { type: string }; script?: string; session?: Session; mode?: AppMode; newCode?: string; savedPath?: string }) => {
       switch (message.type) {
         case 'captureEvent':
           // Refresh state to get updated counts
@@ -111,12 +129,23 @@ export function SidePanel() {
           break
         case 'codegenStarted':
           setState(prev => ({ ...prev, codegenActive: true, codegenScript: message.script || '' }))
+          setCodegenSavedPath(null)
           break
         case 'codegenUpdate':
           setState(prev => ({ ...prev, codegenScript: message.script || '' }))
           break
         case 'codegenStopped':
           setState(prev => ({ ...prev, codegenActive: false, codegenScript: message.script || '' }))
+          if (message.savedPath) {
+            setCodegenSavedPath(message.savedPath)
+          }
+          // Handle dual save paths
+          if ((message as { visiblePath?: string }).visiblePath) {
+            setCodegenVisiblePath((message as { visiblePath?: string }).visiblePath || null)
+          }
+          if ((message as { visibleDirectory?: string }).visibleDirectory) {
+            setCodegenVisibleDirectory((message as { visibleDirectory?: string }).visibleDirectory || null)
+          }
           break
       }
     }
@@ -256,8 +285,11 @@ export function SidePanel() {
       await chrome.runtime.sendMessage({ type: 'createSession', name })
       const res = await chrome.runtime.sendMessage({ type: 'getState' })
       if (res) setState(prev => ({ ...prev, ...res }))
-      // Clear messages for new session
+      // Clear messages and codegen data for new session
       setMessages([])
+      setCodegenSavedPath(null)
+      setCodegenVisiblePath(null)
+      setCodegenVisibleDirectory(null)
     } catch (err) {
       console.error('Create session error:', err)
       showWarning('Failed to create session')
@@ -269,8 +301,21 @@ export function SidePanel() {
       await chrome.runtime.sendMessage({ type: 'switchSession', sessionId })
       const res = await chrome.runtime.sendMessage({ type: 'getState' })
       if (res) setState(prev => ({ ...prev, ...res }))
-      // Load messages for the switched session (TODO: implement message persistence per session)
-      setMessages([])
+
+      // Load session-specific data including messages and codegen info
+      const sessions = res?.sessions as Session[] | undefined
+      const currentSession = sessions?.find(s => s.id === sessionId)
+      if (currentSession) {
+        setMessages(currentSession.messages || [])
+        setCodegenSavedPath(currentSession.codegenSavedPath || null)
+        setCodegenVisiblePath(currentSession.codegenVisiblePath || null)
+        setCodegenVisibleDirectory(currentSession.codegenVisibleDirectory || null)
+      } else {
+        setMessages([])
+        setCodegenSavedPath(null)
+        setCodegenVisiblePath(null)
+        setCodegenVisibleDirectory(null)
+      }
     } catch (err) {
       console.error('Switch session error:', err)
       showWarning((err as Error).message || 'Failed to switch session')
@@ -325,95 +370,131 @@ export function SidePanel() {
     }
   }
 
+  const isActive = state.mode === 'capture' ? state.capturing : state.codegenActive
+
   return (
-    <div className="flex flex-col h-screen bg-[#0a0a0a] text-text-primary selection:bg-primary/30">
+    <div className="flex flex-col h-screen bg-background text-text-primary selection:bg-primary/30">
       {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-[#0a0a0a]/95 backdrop-blur-md sticky top-0 z-10">
-        <div className="flex items-center gap-3 overflow-hidden flex-1 min-w-0">
-          <div className="w-2 h-2 rounded-full bg-primary animate-pulse flex-shrink-0" />
-          <h1 className="text-xs font-semibold tracking-wide text-white font-sans truncate">reverse-api-engineer</h1>
+      <header className="flex items-center justify-between gap-3 px-4 py-3 bg-background backdrop-blur-md sticky top-0 z-10">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          {/* Session Selector */}
+          <SessionSelector
+            sessions={state.sessions || []}
+            activeSessionId={state.activeSessionId}
+            isCapturing={state.capturing}
+            onCreateSession={handleCreateSession}
+            onSwitchSession={handleSwitchSession}
+            onDeleteSession={handleDeleteSession}
+            onRenameSession={handleRenameSession}
+          />
+
+          {/* Mode Switcher */}
+          <ModeSelector
+            mode={state.mode}
+            onModeChange={handleModeChange}
+            disabled={state.capturing || state.codegenActive}
+          />
+
+          {/* Current Task Pill */}
           {state.current_task && (
-            <div className="flex items-center gap-2 ml-4 px-3 py-1 bg-primary/10 border border-primary/20 text-[10px] text-primary/90 font-medium truncate max-w-md">
+            <div
+              className={`flex items-center gap-2 px-3 py-1.5 text-tiny truncate max-w-md rounded-lg border ${state.mode === 'capture'
+                  ? 'bg-capture/5 text-capture/80 border-capture/10'
+                  : 'bg-codegen/5 text-codegen/80 border-codegen/10'
+                }`}
+            >
               <span className="opacity-60">Current:</span>
               <span className="truncate">{state.current_task}</span>
             </div>
           )}
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Mode Toggle */}
-          <ModeSelector
-            mode={state.mode}
-            onModeChange={handleModeChange}
-            disabled={state.capturing || state.codegenActive}
-          />
-        </div>
-      </header>
-
-      {/* Sub-header with session selector and action button */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border/30 bg-[#0a0a0a]/90">
-        <SessionSelector
-          sessions={state.sessions || []}
-          activeSessionId={state.activeSessionId}
-          isCapturing={state.capturing}
-          onCreateSession={handleCreateSession}
-          onSwitchSession={handleSwitchSession}
-          onDeleteSession={handleDeleteSession}
-          onRenameSession={handleRenameSession}
-        />
-
-        {/* Action Button based on mode */}
-        {state.mode === 'capture' ? (
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Icon-based Trigger Button */}
           <Tooltip.Root>
             <Tooltip.Trigger
               render={
                 <Button
-                  onClick={toggleCapture}
-                  className={`px-3 py-1.5 rounded text-[11px] font-bold uppercase tracking-widest transition-all ${state.capturing
-                    ? 'text-primary bg-primary/10 hover:bg-primary/20'
-                    : 'text-white/60 hover:text-white hover:bg-white/10'
-                  }`}
+                  onClick={state.mode === 'capture' ? toggleCapture : toggleCodegen}
+                  className={`p-1.5 rounded-lg cursor-pointer transition-all duration-200 ${isActive
+                      ? state.mode === 'capture'
+                        ? 'text-capture bg-capture/10 hover:bg-capture/20'
+                        : 'text-codegen bg-codegen/10 hover:bg-codegen/20'
+                      : 'text-white/60 hover:text-white hover:bg-white/10'
+                    }`}
+                  aria-label={
+                    state.mode === 'capture'
+                      ? state.capturing ? 'Stop capture' : 'Start capture'
+                      : state.codegenActive ? 'Stop recording' : 'Start recording'
+                  }
                 >
-                  {state.capturing ? 'Stop Capture' : 'Start Capture'}
+                  {isActive ? (
+                    <StopIcon className="w-4 h-4" />
+                  ) : (
+                    <PlayIcon className="w-4 h-4" />
+                  )}
                 </Button>
               }
             />
             <Tooltip.Portal>
               <Tooltip.Positioner sideOffset={4}>
-                <Tooltip.Popup className="bg-background-secondary text-white text-[10px] px-2 py-1 rounded shadow-lg border border-border z-[100] font-mono">
-                  {state.capturing ? 'Stop recording' : 'Start recording'}
-                  {state.stats.total > 0 && ` (${state.stats.total} requests)`}
+                <Tooltip.Popup className="bg-background-elevated text-white text-caption px-2 py-1 rounded-lg z-[100] font-mono">
+                  {state.mode === 'capture'
+                    ? state.capturing
+                      ? `Stop recording (${state.stats.total} requests)`
+                      : 'Start recording traffic'
+                    : state.codegenActive
+                      ? 'Stop code generation'
+                      : 'Start generating code'}
                 </Tooltip.Popup>
               </Tooltip.Positioner>
             </Tooltip.Portal>
           </Tooltip.Root>
-        ) : (
-          <Button
-            onClick={toggleCodegen}
-            className={`px-3 py-1.5 rounded text-[11px] font-bold uppercase tracking-widest transition-all ${state.codegenActive
-              ? 'text-green-400 bg-green-400/10 hover:bg-green-400/20'
-              : 'text-white/60 hover:text-white hover:bg-white/10'
-            }`}
-          >
-            {state.codegenActive ? 'Stop Recording' : 'Start Recording'}
-          </Button>
-        )}
-      </div>
+
+          {/* Settings Button */}
+          <Tooltip.Root>
+            <Tooltip.Trigger
+              render={
+                <Button
+                  onClick={() => setShowSettings(true)}
+                  className="p-1.5 rounded-lg cursor-pointer transition-all duration-200 text-white/60 hover:text-white hover:bg-white/10"
+                  aria-label="Open settings"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </Button>
+              }
+            />
+            <Tooltip.Portal>
+              <Tooltip.Positioner sideOffset={4}>
+                <Tooltip.Popup className="bg-background-elevated text-white text-caption px-2 py-1 rounded-lg z-[100] font-mono">
+                  Settings
+                </Tooltip.Popup>
+              </Tooltip.Positioner>
+            </Tooltip.Portal>
+          </Tooltip.Root>
+        </div>
+      </header>
 
       {/* Native host warning */}
       {!state.nativeHostConnected && state.mode === 'capture' && (
-        <div className="mx-4 mt-4 p-3 border border-primary/50 bg-primary/5 rounded">
+        <div className="mx-4 mt-4 p-3 bg-capture/5 rounded-xl border border-capture/10">
           <div className="flex items-start gap-3">
             <WarningIcon />
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-primary uppercase tracking-tighter">Connection Error</p>
-              <p className="text-[10px] text-text-secondary mt-1 leading-relaxed">
+              <p className="text-small font-bold text-capture uppercase tracking-tight">Connection Error</p>
+              <p className="text-caption text-text-secondary mt-1 leading-relaxed">
                 Native host not found. Execute:
-                <code className="block mt-1 bg-black p-1.5 rounded text-primary border border-primary/20">reverse-api-engineer install-host</code>
+                <code className="block mt-1 bg-background-elevated p-1.5 rounded-lg text-capture/80 font-mono">
+                  reverse-api-engineer install-host
+                </code>
               </p>
               <Button
                 onClick={checkNativeHost}
-                className="mt-2 text-[10px] text-white hover:text-primary transition-colors font-bold underline font-sans"
+                className="mt-2 text-caption text-white hover:text-capture transition-colors font-bold underline cursor-pointer"
+                aria-label="Retry connection to native host"
               >
                 {'>'} Retry connection
               </Button>
@@ -425,8 +506,8 @@ export function SidePanel() {
       {/* Traffic Count indicator (when capturing) */}
       {state.mode === 'capture' && state.stats.total > 0 && (
         <div className="px-4 pt-4 pb-0 flex justify-end">
-          <div className="text-[9px] font-bold text-text-secondary uppercase tracking-widest border border-border/50 px-2 py-0.5 rounded-full bg-white/5">
-            Traffic captured: <span className="text-white">{state.stats.total}</span>
+          <div className="text-tiny text-text-secondary px-2 py-0.5 rounded-full bg-muted border border-border">
+            Traffic captured: <span className="text-white font-bold">{state.stats.total}</span>
           </div>
         </div>
       )}
@@ -434,13 +515,69 @@ export function SidePanel() {
       {/* Main content area - conditional based on mode */}
       {state.mode === 'codegen' ? (
         /* Codegen Mode - Show code display */
-        <div className="flex-1 overflow-hidden p-4">
-          <CodeDisplay
-            code={state.codegenScript || ''}
-            language="python"
-            title="Playwright Script"
-            isLive={state.codegenActive}
-          />
+        <div className="flex-1 overflow-hidden flex flex-col">
+          {/* Dual save completion notification */}
+          {(codegenSavedPath || codegenVisiblePath) && (
+            <div className="mx-3 mb-2 px-3 py-3 bg-[#3b82f6]/10 border border-[#3b82f6]/30 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <Tick02Icon className="w-4 h-4 text-[#3b82f6] flex-shrink-0" />
+                <span className="text-sm text-white font-medium">Script saved (dual location)</span>
+              </div>
+              
+              {/* Visible location - Primary */}
+              {codegenVisiblePath && (
+                <div className="mb-2">
+                  <div className="text-xs text-white/60 mb-1">Visible (easy to find):</div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(codegenVisiblePath)
+                        showWarning('Path copied to clipboard')
+                      }}
+                      className="text-xs text-[#3b82f6] hover:text-[#3b82f6]/80 font-mono truncate flex-1 text-left"
+                      title={codegenVisiblePath}
+                    >
+                      {codegenVisibleDirectory ? codegenVisibleDirectory.split('/').slice(-2).join('/') : codegenVisiblePath.split('/').slice(-3).join('/')}
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (codegenVisibleDirectory) {
+                          // Open folder in file manager (would need native host support)
+                          navigator.clipboard.writeText(codegenVisibleDirectory)
+                          showWarning('Folder path copied')
+                        }
+                      }}
+                      className="text-xs bg-[#3b82f6]/20 hover:bg-[#3b82f6]/30 text-[#3b82f6] px-2 py-1 rounded transition-colors"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+              )}
+              
+              {/* Hidden location - Secondary */}
+              {codegenSavedPath && (
+                <div>
+                  <div className="text-xs text-white/40 mb-1">Hidden (for sync/history):</div>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(codegenSavedPath)
+                      showWarning('Hidden path copied')
+                    }}
+                    className="text-xs text-white/40 hover:text-white/60 font-mono truncate"
+                    title={codegenSavedPath}
+                  >
+                    {codegenSavedPath.split('/').slice(-4).join('/')}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+          <div className="flex-1 pb-3">
+            <CodeBlock language="python" filename="playwright_script.py">
+              {state.codegenScript || ''}
+            </CodeBlock>
+          </div>
         </div>
       ) : (
         /* Capture Mode - Show chat area */
@@ -465,7 +602,7 @@ export function SidePanel() {
                     {msg.role === 'user' ? (
                       <>
                         {msgIdx > 0 && (
-                          <div className="border-t border-primary/30 my-6"></div>
+                          <div className="h-px bg-primary/10 my-6"></div>
                         )}
                         <div className="flex items-start gap-3 w-full">
                           <span className="text-primary font-bold mt-0.5 select-none flex-shrink-0">{'>'}</span>
@@ -490,12 +627,23 @@ export function SidePanel() {
           </div>
 
           {/* Chat input */}
-          <div className="relative border-t border-border/30 bg-[#0a0a0a]">
+          <div className="relative bg-background">
             {warningMessage && (
-              <div className="absolute bottom-full left-0 right-0 px-4 py-2 bg-primary/20 backdrop-blur-sm border-t border-primary/30 animate-in slide-in-from-bottom-2 duration-200">
+              <div
+                className={`absolute bottom-full left-0 right-0 px-4 py-2 backdrop-blur-sm animate-slide-in-from-bottom ${state.mode === 'capture' ? 'bg-capture/10' : 'bg-codegen/10'
+                  }`}
+              >
                 <div className="flex items-center gap-2">
-                  <div className="w-1 h-1 bg-primary rounded-full" />
-                  <span className="text-[10px] font-medium text-primary uppercase tracking-wider">{warningMessage}</span>
+                  <div
+                    className={`w-1 h-1 rounded-full ${state.mode === 'capture' ? 'bg-capture' : 'bg-codegen'
+                      }`}
+                  />
+                  <span
+                    className={`text-tiny ${state.mode === 'capture' ? 'text-capture' : 'text-codegen'
+                      }`}
+                  >
+                    {warningMessage}
+                  </span>
                 </div>
               </div>
             )}
@@ -511,9 +659,85 @@ export function SidePanel() {
                     ? 'Capture traffic to begin'
                     : 'Build an API client...'
               }
+              mode={state.mode}
             />
           </div>
         </>
+      )}
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-background border border-border rounded-xl p-6 w-80 max-w-[90vw] shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-white">Settings</h2>
+              <button
+                onClick={() => setShowSettings(false)}
+                className="text-white/60 hover:text-white p-1"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Save Location Setting */}
+            <div className="space-y-3">
+              <label className="text-sm text-white/80 block">Save Location</label>
+              
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="saveLocation"
+                    checked={settings.saveLocation === 'downloads'}
+                    onChange={() => {
+                      const newSettings = { ...settings, saveLocation: 'downloads' as const }
+                      setSettings(newSettings)
+                      chrome.runtime.sendMessage({ type: 'saveSettings', settings: newSettings })
+                    }}
+                    className="w-4 h-4 accent-primary"
+                  />
+                  <span className="text-sm text-white/70">Downloads folder (default)</span>
+                </label>
+                
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="saveLocation"
+                    checked={settings.saveLocation !== 'downloads'}
+                    onChange={() => {
+                      const customPath = prompt('Enter custom folder path:', '/Users/')
+                      if (customPath) {
+                        const newSettings = { ...settings, saveLocation: customPath }
+                        setSettings(newSettings)
+                        chrome.runtime.sendMessage({ type: 'saveSettings', settings: newSettings })
+                      }
+                    }}
+                    className="w-4 h-4 accent-primary"
+                  />
+                  <span className="text-sm text-white/70">Custom folder</span>
+                </label>
+              </div>
+
+              {settings.saveLocation !== 'downloads' && (
+                <div className="mt-2 p-2 bg-background-elevated rounded-lg">
+                  <div className="text-xs text-white/50 mb-1">Current path:</div>
+                  <div className="text-xs text-white/80 font-mono break-all">{settings.saveLocation}</div>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-border">
+              <button
+                onClick={() => setShowSettings(false)}
+                className="w-full py-2 bg-primary/20 hover:bg-primary/30 text-primary rounded-lg text-sm font-medium transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -521,9 +745,9 @@ export function SidePanel() {
 
 function WarningIcon(): JSX.Element {
   return (
-    <div className="text-primary flex-shrink-0">
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+    <div className="text-capture flex-shrink-0">
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
       </svg>
     </div>
   )

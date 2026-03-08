@@ -121,6 +121,8 @@ class OpenCodeEngineer(BaseEngineer):
         self._last_error: str | None = None
         self._session_id: str | None = None
         self._last_event_time = 0.0
+        self._work_started = False  # Track if any real work has been done
+        self._busy_time: float | None = None  # When session became busy
 
         # Read OpenCode server authentication from environment variables
         self.opencode_password = os.environ.get("OPENCODE_SERVER_PASSWORD")
@@ -359,21 +361,33 @@ class OpenCodeEngineer(BaseEngineer):
                                 attempt = status.get("attempt", 1)
                                 message = status.get("message", "")
                                 self.opencode_ui.session_retry(attempt, message)
+                            elif status_type == "busy":
+                                import time
+
+                                self._busy_time = time.time()
+                                self.opencode_ui.session_status(status_type)
                             else:
                                 self.opencode_ui.session_status(status_type)
 
                             if status_type == "idle":
+                                # Check if this is suspiciously fast (< 1 second of work)
+                                import time
+
+                                if self._busy_time and (time.time() - self._busy_time) < 1.0 and not self._work_started:
+                                    debug_log("Suspiciously fast idle - checking for errors")
+                                    # Try to get session details to check for error
+                                    await self._check_session_error(client)
                                 debug_log("Our session status is idle, returning!")
                                 return  # Done!
 
-                    elif event_type == "permission.updated":
+                    elif event_type == "permission.updated" or event_type == "permission.asked":
                         # Auto-approve permissions so the agent can proceed
                         permission_id = properties.get("id")
                         perm_session = properties.get("sessionID")
                         perm_type = properties.get("type", "")
                         perm_title = properties.get("title", "")
 
-                        debug_log(f"permission.updated: id={permission_id}, type={perm_type}, title={perm_title}")
+                        debug_log(f"{event_type}: id={permission_id}, type={perm_type}, title={perm_title}")
 
                         if perm_session == self._session_id and permission_id:
                             # Show permission request in UI
@@ -437,6 +451,13 @@ class OpenCodeEngineer(BaseEngineer):
                                 provider = error_data.get("providerID", "unknown")
                                 msg = error_data.get("message", "Authentication failed")
                                 self._last_error = f"Auth error ({provider}): {msg}"
+                            elif error_name in ("ProviderModelNotFoundError", "ModelNotFoundError"):
+                                provider = error_data.get("providerID", "unknown")
+                                model = error_data.get("modelID", "unknown")
+                                suggestions = error_data.get("suggestions", [])
+                                self._last_error = f"Model not found: {provider}/{model}"
+                                if suggestions:
+                                    self._last_error += f"\n  Did you mean: {', '.join(suggestions)}?"
                             elif error_name == "APIError":
                                 msg = error_data.get("message", "API error")
                                 status = error_data.get("statusCode", "")
@@ -459,6 +480,62 @@ class OpenCodeEngineer(BaseEngineer):
             self._last_error = format_error(e)
             debug_log(f"Exception in _stream_events: {self._last_error}")
 
+    async def _check_session_error(self, client: httpx.AsyncClient):
+        """Check session for errors when we get suspiciously fast idle."""
+        try:
+            # Get the session details to check for errors
+            r = await client.get(f"/session/{self._session_id}")
+            if r.status_code == 200:
+                session_data = r.json()
+                debug_log(f"Session data: {session_data}")
+
+                # Check for error in session status
+                status = session_data.get("status", {})
+                if status.get("type") == "error":
+                    error = status.get("error", {})
+                    error_name = error.get("name", "UnknownError")
+                    error_data = error.get("data", {})
+
+                    if error_name in ("ProviderModelNotFoundError", "ModelNotFoundError"):
+                        provider = error_data.get("providerID", "unknown")
+                        model = error_data.get("modelID", "unknown")
+                        suggestions = error_data.get("suggestions", [])
+                        self._last_error = f"Model not found: {provider}/{model}"
+                        if suggestions:
+                            self._last_error += f"\n  Did you mean: {', '.join(suggestions)}?"
+                    else:
+                        msg = error_data.get("message", "") if isinstance(error_data, dict) else str(error_data)
+                        self._last_error = f"{error_name}: {msg}" if msg else error_name
+
+                    if self._last_error:
+                        self.opencode_ui.error(self._last_error)
+
+            # Also check messages for errors
+            msg_r = await client.get(f"/session/{self._session_id}/message")
+            if msg_r.status_code == 200:
+                messages = msg_r.json()
+                # Look for error messages
+                for msg in messages:
+                    info = msg.get("info", {})
+                    if info.get("role") == "assistant":
+                        # Check parts for error info
+                        for part in msg.get("parts", []):
+                            if part.get("type") == "error":
+                                error_data = part.get("error", {})
+                                error_name = error_data.get("name", "Error")
+
+                                if error_name in ("ProviderModelNotFoundError", "ModelNotFoundError"):
+                                    provider = error_data.get("data", {}).get("providerID", "unknown")
+                                    model = error_data.get("data", {}).get("modelID", "unknown")
+                                    suggestions = error_data.get("data", {}).get("suggestions", [])
+                                    self._last_error = f"Model not found: {provider}/{model}"
+                                    if suggestions:
+                                        self._last_error += f"\n  Did you mean: {', '.join(suggestions)}?"
+                                    self.opencode_ui.error(self._last_error)
+                                    return
+        except Exception as e:
+            debug_log(f"Error checking session: {e}")
+
     async def _handle_part_update(self, properties: dict, seen_parts: set):
         """Handle message.part.updated events."""
         part = properties.get("part", {})
@@ -468,13 +545,25 @@ class OpenCodeEngineer(BaseEngineer):
         part_type = part.get("type")
         part_session = part.get("sessionID")
 
+        debug_log(f"Part update: type={part_type}, session={part_session}, our={self._session_id}")
+
         # Only process parts for our session
         if part_session != self._session_id:
+            debug_log(f"Skipping part for other session")
             return
 
         if part_type == "text":
             text = part.get("text", "")
             debug_log(f"Handling text part: id={part_id}, delta={'yes' if delta else 'no'}, len={len(text)}")
+            
+            # Filter out known prompt text patterns that get echoed back
+            # This prevents the tag context section from appearing in streaming output
+            # Check for the specific tag context pattern that appears at the end of prompts
+            tag_context_pattern = "By default, treat this as an iterative refinement"
+            if tag_context_pattern in text and "Note: Full message history is available" in text:
+                debug_log(f"Filtering out echoed tag context from streaming output")
+                return
+            
             # Use delta for incremental updates if available
             self.opencode_ui.update_text(text, delta)
 
@@ -491,6 +580,7 @@ class OpenCodeEngineer(BaseEngineer):
             debug_log(f"Handling tool part: id={part_id}, tool={tool_name}, status={status}")
 
             if status == "running" and part_id not in seen_parts:
+                self._work_started = True  # Mark that real work has started
                 seen_parts.add(part_id)
                 tool_input = state.get("input", {})
                 self.opencode_ui.tool_start(tool_name, tool_input)
@@ -541,6 +631,10 @@ class OpenCodeEngineer(BaseEngineer):
             self.usage_metadata["cache_read_tokens"] = self.usage_metadata.get("cache_read_tokens", 0) + cache_read
             self.usage_metadata["cache_creation_tokens"] = self.usage_metadata.get("cache_creation_tokens", 0) + cache_write
             self.usage_metadata["cost"] = self.usage_metadata.get("cost", 0) + cost
+
+        else:
+            # Log unhandled part types for debugging
+            debug_log(f"Unhandled part type: {part_type}")
 
 
 def run_opencode_engineering(
