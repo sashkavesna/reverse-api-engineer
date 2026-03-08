@@ -754,7 +754,7 @@ def handle_settings(mode_color=THEME_PRIMARY):
 
         current = config_manager.get("stagehand_model", "openai/computer-use-preview-2025-03-11")
         instruction = (
-            "(Format: 'openai/model' or 'anthropic/model', e.g., 'openai/computer-use-preview-2025-03-11' or 'anthropic/claude-sonnet-4-6-20250929')"
+            "(Format: 'openai/model' or 'anthropic/model', e.g., 'openai/computer-use-preview-2025-03-11' or 'anthropic/claude-sonnet-4-6-20260301')"
         )
 
         new_model = questionary.text(
