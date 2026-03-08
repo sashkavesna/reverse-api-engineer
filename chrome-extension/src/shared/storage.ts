@@ -6,7 +6,7 @@ import type { Settings } from './types'
 
 const DEFAULT_SETTINGS: Settings = {
   captureTypes: ['xhr', 'fetch', 'websocket'],
-  lastModel: 'claude-sonnet-4-5'
+  lastModel: 'claude-sonnet-4-6'
 }
 
 export async function getSettings(): Promise<Settings> {

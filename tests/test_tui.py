@@ -43,7 +43,7 @@ class TestClaudeUI:
     def test_header(self):
         """Header displays run info."""
         ui, console = self._make_ui()
-        ui.header("run123", "test prompt", "claude-sonnet-4-5", "claude")
+        ui.header("run123", "test prompt", "claude-sonnet-4-6", "claude")
         output = console.file.getvalue()
         assert "run123" in output
         assert "test prompt" in output
@@ -51,7 +51,7 @@ class TestClaudeUI:
     def test_header_no_sdk(self):
         """Header without sdk shows model differently."""
         ui, console = self._make_ui()
-        ui.header("run123", "test prompt", "claude-sonnet-4-5")
+        ui.header("run123", "test prompt", "claude-sonnet-4-6")
         output = console.file.getvalue()
         assert "run123" in output
 
@@ -295,12 +295,12 @@ class TestGetModelChoices:
     def test_includes_sonnet(self):
         """Includes Sonnet model."""
         values = [c["value"] for c in get_model_choices()]
-        assert "claude-sonnet-4-5" in values
+        assert "claude-sonnet-4-6" in values
 
     def test_includes_opus(self):
         """Includes Opus model."""
         values = [c["value"] for c in get_model_choices()]
-        assert "claude-opus-4-5" in values
+        assert "claude-opus-4-6" in values
 
 
 class TestDisplayBanner:
@@ -316,7 +316,7 @@ class TestDisplayBanner:
     def test_banner_with_sdk_and_model(self):
         """Banner with SDK and model info."""
         console = Console(file=StringIO(), no_color=True)
-        display_banner(console, sdk="claude", model="claude-sonnet-4-5")
+        display_banner(console, sdk="claude", model="claude-sonnet-4-6")
         output = console.file.getvalue()
         assert "claude" in output
 

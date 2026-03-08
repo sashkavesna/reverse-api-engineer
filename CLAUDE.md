@@ -112,9 +112,9 @@ uv run mypy src           # Static analysis
 
 ```json
 {
-  "claude_code_model": "claude-sonnet-4-5",    // For Claude SDK
+  "claude_code_model": "claude-sonnet-4-6",    // For Claude SDK
   "opencode_provider": "anthropic",            // For OpenCode SDK
-  "opencode_model": "claude-sonnet-4-5",       // For OpenCode SDK
+  "opencode_model": "claude-sonnet-4-6",       // For OpenCode SDK
   "sdk": "claude",                             // "claude" or "opencode"
   "agent_provider": "browser-use",             // "browser-use" or "stagehand"
   "browser_use_model": "bu-llm",               // Browser-use agent model
@@ -124,7 +124,7 @@ uv run mypy src           # Static analysis
 ```
 
 ### Model Naming
-- **Claude models**: `claude-sonnet-4-5`, `claude-opus-4-5`, `claude-haiku-4-5`
+- **Claude models**: `claude-sonnet-4-6`, `claude-opus-4-6`, `claude-haiku-4-5`
 - **Gemini models**: `gemini-3-flash`, `gemini-3-pro`, `gemini-3-pro-low`, `gemini-3-pro-high`
 - **Antigravity models** (free tier): Require OpenCode SDK with `opencode_provider: "google"`
 - **Agent models**: Format varies by provider
@@ -136,7 +136,7 @@ uv run mypy src           # Static analysis
 ### Three-tier fallback for cost calculation:
 1. **Local pricing** (`pricing.py`): Built-in prices for Claude/Gemini models
 2. **LiteLLM pricing** (optional `[pricing]` extra): Extended coverage for 100+ models
-3. **Default pricing**: Falls back to Claude Sonnet 4.5 pricing
+3. **Default pricing**: Falls back to Claude Sonnet 4.6 pricing
 
 Pricing tracks:
 - Input/output tokens

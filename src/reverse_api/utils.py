@@ -136,7 +136,7 @@ async def _generate_folder_name_opencode_async(prompt: str, session_id: str = No
     # Get config for provider and model
     config_manager = ConfigManager(get_config_path())
     opencode_provider = config_manager.get("opencode_provider", "anthropic")
-    opencode_model = config_manager.get("opencode_model", "claude-opus-4-5")
+    opencode_model = config_manager.get("opencode_model", "claude-opus-4-6")
 
     folder_prompt = (
         f"Generate a short folder name (1-3 words, lowercase, underscores) for this task: {prompt}\n\n"

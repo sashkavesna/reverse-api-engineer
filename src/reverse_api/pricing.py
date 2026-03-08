@@ -1,14 +1,14 @@
 """Pricing models for different models."""
 
 MODEL_PRICING = {
-    "claude-sonnet-4-5": {
+    "claude-sonnet-4-6": {
         "input": 3.00,
         "output": 15.00,
         "cache_creation": 3.75,
         "cache_read": 0.30,
         "reasoning": 15.00,
     },
-    "claude-opus-4-5": {
+    "claude-opus-4-6": {
         "input": 15.00,
         "output": 25.00,
         "cache_creation": 6.25,
@@ -50,42 +50,42 @@ MODEL_PRICING = {
         "cache_read": 0.20,
         "reasoning": 12,
     },
-    "claude-sonnet-4-5-thinking-low": {
+    "claude-sonnet-4-6-thinking-low": {
         "input": 3.00,
         "output": 15.00,
         "cache_creation": 3.75,
         "cache_read": 0.30,
         "reasoning": 15.00,
     },
-    "claude-sonnet-4-5-thinking-medium": {
+    "claude-sonnet-4-6-thinking-medium": {
         "input": 3.00,
         "output": 15.00,
         "cache_creation": 3.75,
         "cache_read": 0.30,
         "reasoning": 15.00,
     },
-    "claude-sonnet-4-5-thinking-high": {
+    "claude-sonnet-4-6-thinking-high": {
         "input": 3.00,
         "output": 15.00,
         "cache_creation": 3.75,
         "cache_read": 0.30,
         "reasoning": 15.00,
     },
-    "claude-opus-4-5-thinking-low": {
+    "claude-opus-4-6-thinking-low": {
         "input": 15.00,
         "output": 25.00,
         "cache_creation": 6.25,
         "cache_read": 0.50,
         "reasoning": 25.00,
     },
-    "claude-opus-4-5-thinking-medium": {
+    "claude-opus-4-6-thinking-medium": {
         "input": 15.00,
         "output": 25.00,
         "cache_creation": 6.25,
         "cache_read": 0.50,
         "reasoning": 25.00,
     },
-    "claude-opus-4-5-thinking-high": {
+    "claude-opus-4-6-thinking-high": {
         "input": 15.00,
         "output": 25.00,
         "cache_creation": 6.25,
@@ -98,14 +98,13 @@ MODEL_PRICING = {
 # Model name mapping for LiteLLM compatibility
 # Maps our model IDs to possible LiteLLM model name variations
 _LITELLM_MODEL_MAP = {
-    "claude-sonnet-4-5": [
-        "claude-sonnet-4-5",
-        "anthropic.claude-sonnet-4-5",
-        "claude-3-5-sonnet-20241022",
+    "claude-sonnet-4-6": [
+        "claude-sonnet-4-6",
+        "anthropic.claude-sonnet-4-6",
     ],
-    "claude-opus-4-5": [
-        "claude-opus-4-5",
-        "anthropic.claude-opus-4-5",
+    "claude-opus-4-6": [
+        "claude-opus-4-6",
+        "anthropic.claude-opus-4-6",
     ],
     "claude-haiku-4-5": [
         "claude-haiku-4-5",
@@ -213,10 +212,10 @@ def calculate_cost(
     Uses a 3-tier fallback system:
     1. Local MODEL_PRICING dictionary (highest priority)
     2. LiteLLM pricing package (if installed and model found)
-    3. Claude Sonnet 4.5 pricing (ultimate fallback)
+    3. Claude Sonnet 4.6 pricing (ultimate fallback)
 
     Args:
-        model_id: Model identifier (e.g., "claude-sonnet-4-5")
+        model_id: Model identifier (e.g., "claude-sonnet-4-6")
         input_tokens: Number of input tokens
         output_tokens: Number of output tokens
         cache_creation_tokens: Number of tokens written to cache
@@ -231,7 +230,7 @@ def calculate_cost(
     elif model_id and (litellm_pricing := _get_pricing_from_litellm(model_id)):
         pricing = litellm_pricing
     else:
-        pricing = MODEL_PRICING["claude-sonnet-4-5"]
+        pricing = MODEL_PRICING["claude-sonnet-4-6"]
 
     cost = (
         (input_tokens / 1_000_000 * pricing["input"])

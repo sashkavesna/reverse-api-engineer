@@ -57,7 +57,7 @@ class TestRunReverseEngineering:
                     prompt="test prompt",
                     sdk="opencode",
                     opencode_provider="anthropic",
-                    opencode_model="claude-opus-4-5",
+                    opencode_model="claude-opus-4-6",
                 )
                 mock_cls.assert_called_once()
 
@@ -116,7 +116,7 @@ class TestRunReverseEngineering:
                     run_id="test123",
                     har_path=har_path,
                     prompt="test",
-                    model="claude-opus-4-5",
+                    model="claude-opus-4-6",
                     additional_instructions="extra",
                     output_dir="/custom",
                     verbose=False,
@@ -127,7 +127,7 @@ class TestRunReverseEngineering:
                 )
                 kwargs = mock_cls.call_args[1]
                 assert kwargs["run_id"] == "test123"
-                assert kwargs["model"] == "claude-opus-4-5"
+                assert kwargs["model"] == "claude-opus-4-6"
                 assert kwargs["output_language"] == "typescript"
                 assert kwargs["output_mode"] == "docs"
                 assert kwargs["is_fresh"] is True

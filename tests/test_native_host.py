@@ -594,7 +594,7 @@ class TestNativeHostGenerateAsync:
     def _make_handler(self):
         with patch("reverse_api.native_host.ConfigManager") as mock_cm:
             mock_cm.return_value.config_path = Path("/test/config.json")
-            mock_cm.return_value.get.return_value = "claude-sonnet-4-5"
+            mock_cm.return_value.get.return_value = "claude-sonnet-4-6"
             return NativeHostHandler()
 
     @pytest.mark.asyncio
@@ -603,7 +603,7 @@ class TestNativeHostGenerateAsync:
         handler = self._make_handler()
 
         with patch("reverse_api.native_host.get_har_dir", return_value=tmp_path / "har"):
-            result = await handler._generate_async("run123", "claude-sonnet-4-5", {"_callbackId": "cb1"})
+            result = await handler._generate_async("run123", "claude-sonnet-4-6", {"_callbackId": "cb1"})
             assert result["type"] == "error"
             assert "not found" in result["message"]
 
@@ -629,7 +629,7 @@ class TestNativeHostGenerateAsync:
                 with patch("reverse_api.native_host.send_message"):
                     with patch("reverse_api.engineer.ClaudeEngineer", return_value=mock_engineer):
                         result = await handler._generate_async(
-                            "run123", "claude-sonnet-4-5", {"_callbackId": "cb1"}
+                            "run123", "claude-sonnet-4-6", {"_callbackId": "cb1"}
                         )
                         assert result["type"] == "error"
                         assert result["retryable"] is True
@@ -657,7 +657,7 @@ class TestNativeHostGenerateAsync:
                     with patch("reverse_api.engineer.ClaudeEngineer", return_value=mock_engineer):
                         with patch("reverse_api.session.SessionManager"):
                             result = await handler._generate_async(
-                                "run123", "claude-sonnet-4-5", {"_callbackId": "cb1"}
+                                "run123", "claude-sonnet-4-6", {"_callbackId": "cb1"}
                             )
                             assert result["type"] == "complete"
 
@@ -668,7 +668,7 @@ class TestNativeHostChatAsync:
     def _make_handler(self):
         with patch("reverse_api.native_host.ConfigManager") as mock_cm:
             mock_cm.return_value.config_path = Path("/test/config.json")
-            mock_cm.return_value.get.return_value = "claude-sonnet-4-5"
+            mock_cm.return_value.get.return_value = "claude-sonnet-4-6"
             handler = NativeHostHandler()
             handler.config = mock_cm.return_value
             return handler

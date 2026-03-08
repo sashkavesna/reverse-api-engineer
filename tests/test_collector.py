@@ -20,11 +20,11 @@ class TestCollectorInit:
                 collector = Collector(
                     run_id="test123",
                     prompt="collect startup data",
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-6",
                 )
                 assert collector.run_id == "test123"
                 assert collector.prompt == "collect startup data"
-                assert collector.model == "claude-sonnet-4-5"
+                assert collector.model == "claude-sonnet-4-6"
                 assert collector.usage_metadata == {}
 
     def test_init_with_output_dir(self):
@@ -34,7 +34,7 @@ class TestCollectorInit:
                 collector = Collector(
                     run_id="test123",
                     prompt="test",
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-6",
                     output_dir="/custom/output",
                 )
                 assert collector.output_dir == "/custom/output"
@@ -50,7 +50,7 @@ class TestCollectorBuildPrompt:
                 collector = Collector(
                     run_id="test123",
                     prompt="collect Y Combinator startups",
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-6",
                 )
                 collector._collected_dir = Path("/tmp/test")
                 collector.items_path = Path("/tmp/test/items.jsonl")
@@ -74,7 +74,7 @@ class TestCollectorRun:
                 collector = Collector(
                     run_id="test123",
                     prompt="collect startups",
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-6",
                 )
 
                 collected_dir = tmp_path / "collected"
@@ -103,7 +103,7 @@ class TestCollectorRun:
                 collector = Collector(
                     run_id="test123",
                     prompt="collect stuff",
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-6",
                 )
 
                 with patch("reverse_api.collector.generate_folder_name", return_value="test"):
@@ -124,7 +124,7 @@ class TestCollectorRun:
                 collector = Collector(
                     run_id="test123",
                     prompt="collect stuff",
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-6",
                 )
 
                 with patch("reverse_api.collector.generate_folder_name", return_value="test"):
@@ -151,7 +151,7 @@ class TestCollectorAgentLoop:
                 collector = Collector(
                     run_id="test123",
                     prompt="test",
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-6",
                 )
                 collector._collected_dir = tmp_path
 
@@ -174,7 +174,7 @@ class TestCollectorAgentLoop:
                 collector = Collector(
                     run_id="test123",
                     prompt="test",
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-6",
                 )
                 collector._collected_dir = tmp_path
                 collector.items_path = tmp_path / "items.jsonl"
@@ -211,7 +211,7 @@ class TestCollectorAgentLoop:
                 collector = Collector(
                     run_id="test123",
                     prompt="test",
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-6",
                 )
                 collector._collected_dir = tmp_path
                 collector.items_path = tmp_path / "items.jsonl"
@@ -247,7 +247,7 @@ class TestCollectorAgentLoop:
                 collector = Collector(
                     run_id="test123",
                     prompt="test",
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-6",
                 )
                 collector._collected_dir = tmp_path
                 collector.items_path = tmp_path / "items.jsonl"
@@ -310,7 +310,7 @@ class TestCollectorAgentLoop:
                 collector = Collector(
                     run_id="test123",
                     prompt="test",
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-6",
                 )
                 collector._collected_dir = tmp_path
                 collector.items_path = tmp_path / "items.jsonl"
@@ -359,7 +359,7 @@ class TestCollectorAgentLoop:
                 collector = Collector(
                     run_id="test123",
                     prompt="test",
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-6",
                 )
                 collector._collected_dir = tmp_path
                 collector.items_path = tmp_path / "items.jsonl"
@@ -407,7 +407,7 @@ class TestCollectorAgentLoop:
                 collector = Collector(
                     run_id="test123",
                     prompt="test",
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-6",
                 )
                 collector._collected_dir = tmp_path
                 collector.items_path = tmp_path / "items.jsonl"
@@ -440,7 +440,7 @@ class TestCollectorExportCsv:
                 collector = Collector(
                     run_id="test123",
                     prompt="test",
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-6",
                 )
                 items = [
                     {"name": "Acme", "url": "https://acme.com"},
@@ -464,7 +464,7 @@ class TestCollectorExportCsv:
                 collector = Collector(
                     run_id="test123",
                     prompt="test",
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-6",
                 )
                 items = [
                     {"name": "Acme", "category": "tech"},
@@ -486,7 +486,7 @@ class TestCollectorExportCsv:
                 collector = Collector(
                     run_id="test123",
                     prompt="test",
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-6",
                 )
                 csv_path = tmp_path / "data.csv"
                 collector._export_csv(csv_path, [])
@@ -499,7 +499,7 @@ class TestCollectorExportCsv:
                 collector = Collector(
                     run_id="test123",
                     prompt="test",
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-6",
                 )
                 items = [{"name": "Acme", "value": None}]
                 csv_path = tmp_path / "data.csv"
@@ -521,7 +521,7 @@ class TestCollectorExportReadme:
                 collector = Collector(
                     run_id="test123",
                     prompt="collect startups",
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-6",
                 )
                 collector._folder_name = "startups"
 
@@ -549,7 +549,7 @@ class TestCollectorExportReadme:
                 collector = Collector(
                     run_id="test123",
                     prompt="test",
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-6",
                 )
                 collector._folder_name = None
 
@@ -570,7 +570,7 @@ class TestCollectorFinalizeCollection:
                 collector = Collector(
                     run_id="test123",
                     prompt="test",
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-6",
                 )
                 collector._collected_dir = None
                 result = collector._finalize_collection()
@@ -583,7 +583,7 @@ class TestCollectorFinalizeCollection:
                 collector = Collector(
                     run_id="test123",
                     prompt="test",
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-6",
                 )
                 collector._collected_dir = tmp_path
                 collector._folder_name = "test"
@@ -598,7 +598,7 @@ class TestCollectorFinalizeCollection:
                 collector = Collector(
                     run_id="test123",
                     prompt="test",
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-6",
                 )
                 collector._collected_dir = tmp_path
                 collector._folder_name = "test"
@@ -616,7 +616,7 @@ class TestCollectorFinalizeCollection:
                 collector = Collector(
                     run_id="test123",
                     prompt="test",
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-6",
                 )
                 collector._collected_dir = tmp_path
                 collector._folder_name = "test"
@@ -646,7 +646,7 @@ class TestCollectorFinalizeCollection:
                 collector = Collector(
                     run_id="test123",
                     prompt="test",
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-6",
                 )
                 collector._collected_dir = tmp_path
                 collector._folder_name = "test"
@@ -670,7 +670,7 @@ class TestCollectorFinalizeCollection:
                 collector = Collector(
                     run_id="test123",
                     prompt="test",
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-6",
                 )
                 collector._collected_dir = tmp_path
                 collector._folder_name = "test"
@@ -697,7 +697,7 @@ class TestCollectorFinalizeCollection:
                 collector = Collector(
                     run_id="test123",
                     prompt="test",
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-6",
                 )
                 collector._collected_dir = tmp_path
                 collector._folder_name = "test"
@@ -720,7 +720,7 @@ class TestCollectorFinalizeCollection:
                 collector = Collector(
                     run_id="test123",
                     prompt="test",
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-6",
                 )
                 collector._collected_dir = tmp_path
                 collector._folder_name = "test"

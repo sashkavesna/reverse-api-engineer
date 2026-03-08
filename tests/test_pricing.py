@@ -18,8 +18,8 @@ class TestModelPricing:
 
     def test_has_claude_models(self):
         """All Claude models are in pricing."""
-        assert "claude-sonnet-4-5" in MODEL_PRICING
-        assert "claude-opus-4-5" in MODEL_PRICING
+        assert "claude-sonnet-4-6" in MODEL_PRICING
+        assert "claude-opus-4-6" in MODEL_PRICING
         assert "claude-haiku-4-5" in MODEL_PRICING
 
     def test_has_gemini_models(self):
@@ -31,12 +31,12 @@ class TestModelPricing:
 
     def test_has_thinking_models(self):
         """Thinking model variants are in pricing."""
-        assert "claude-sonnet-4-5-thinking-low" in MODEL_PRICING
-        assert "claude-sonnet-4-5-thinking-medium" in MODEL_PRICING
-        assert "claude-sonnet-4-5-thinking-high" in MODEL_PRICING
-        assert "claude-opus-4-5-thinking-low" in MODEL_PRICING
-        assert "claude-opus-4-5-thinking-medium" in MODEL_PRICING
-        assert "claude-opus-4-5-thinking-high" in MODEL_PRICING
+        assert "claude-sonnet-4-6-thinking-low" in MODEL_PRICING
+        assert "claude-sonnet-4-6-thinking-medium" in MODEL_PRICING
+        assert "claude-sonnet-4-6-thinking-high" in MODEL_PRICING
+        assert "claude-opus-4-6-thinking-low" in MODEL_PRICING
+        assert "claude-opus-4-6-thinking-medium" in MODEL_PRICING
+        assert "claude-opus-4-6-thinking-high" in MODEL_PRICING
 
     def test_pricing_keys(self):
         """Each model has required pricing keys."""
@@ -52,13 +52,13 @@ class TestModelPricing:
 
     def test_opus_more_expensive_than_sonnet(self):
         """Opus should be more expensive than Sonnet."""
-        assert MODEL_PRICING["claude-opus-4-5"]["input"] > MODEL_PRICING["claude-sonnet-4-5"]["input"]
-        assert MODEL_PRICING["claude-opus-4-5"]["output"] > MODEL_PRICING["claude-sonnet-4-5"]["output"]
+        assert MODEL_PRICING["claude-opus-4-6"]["input"] > MODEL_PRICING["claude-sonnet-4-6"]["input"]
+        assert MODEL_PRICING["claude-opus-4-6"]["output"] > MODEL_PRICING["claude-sonnet-4-6"]["output"]
 
     def test_haiku_cheapest_claude(self):
         """Haiku should be cheapest Claude model."""
-        assert MODEL_PRICING["claude-haiku-4-5"]["input"] < MODEL_PRICING["claude-sonnet-4-5"]["input"]
-        assert MODEL_PRICING["claude-haiku-4-5"]["output"] < MODEL_PRICING["claude-sonnet-4-5"]["output"]
+        assert MODEL_PRICING["claude-haiku-4-5"]["input"] < MODEL_PRICING["claude-sonnet-4-6"]["input"]
+        assert MODEL_PRICING["claude-haiku-4-5"]["output"] < MODEL_PRICING["claude-sonnet-4-6"]["output"]
 
 
 class TestGetModelPricing:
@@ -66,7 +66,7 @@ class TestGetModelPricing:
 
     def test_known_model(self):
         """Returns pricing for known model."""
-        pricing = get_model_pricing("claude-sonnet-4-5")
+        pricing = get_model_pricing("claude-sonnet-4-6")
         assert pricing is not None
         assert pricing["input"] == 3.00
         assert pricing["output"] == 15.00
@@ -98,7 +98,7 @@ class TestGetPricingFromLitellm:
     def test_litellm_with_direct_match(self):
         """Returns pricing for direct model match."""
         mock_model_cost = {
-            "claude-sonnet-4-5": {
+            "claude-sonnet-4-6": {
                 "input_cost_per_token": 3e-06,
                 "output_cost_per_token": 15e-06,
                 "cache_creation_input_token_cost": 3.75e-06,
@@ -108,7 +108,7 @@ class TestGetPricingFromLitellm:
         mock_litellm = MagicMock()
         mock_litellm.model_cost = mock_model_cost
         with patch.dict("sys.modules", {"litellm": mock_litellm}):
-            result = _get_pricing_from_litellm("claude-sonnet-4-5")
+            result = _get_pricing_from_litellm("claude-sonnet-4-6")
             assert result is not None
             assert abs(result["input"] - 3.0) < 0.01
             assert abs(result["output"] - 15.0) < 0.01
@@ -116,7 +116,7 @@ class TestGetPricingFromLitellm:
     def test_litellm_with_mapped_model(self):
         """Returns pricing via model name mapping."""
         mock_model_cost = {
-            "anthropic.claude-sonnet-4-5": {
+            "anthropic.claude-sonnet-4-6": {
                 "input_cost_per_token": 3e-06,
                 "output_cost_per_token": 15e-06,
                 "cache_creation_input_token_cost": 3.75e-06,
@@ -126,7 +126,7 @@ class TestGetPricingFromLitellm:
         mock_litellm = MagicMock()
         mock_litellm.model_cost = mock_model_cost
         with patch.dict("sys.modules", {"litellm": mock_litellm}):
-            result = _get_pricing_from_litellm("claude-sonnet-4-5")
+            result = _get_pricing_from_litellm("claude-sonnet-4-6")
             assert result is not None
 
     def test_litellm_model_not_found(self):
@@ -173,8 +173,8 @@ class TestLitellmModelMap:
 
     def test_map_has_claude_models(self):
         """Map includes Claude model variations."""
-        assert "claude-sonnet-4-5" in _LITELLM_MODEL_MAP
-        assert "claude-opus-4-5" in _LITELLM_MODEL_MAP
+        assert "claude-sonnet-4-6" in _LITELLM_MODEL_MAP
+        assert "claude-opus-4-6" in _LITELLM_MODEL_MAP
         assert "claude-haiku-4-5" in _LITELLM_MODEL_MAP
 
     def test_map_has_gemini_models(self):
@@ -195,7 +195,7 @@ class TestCalculateCost:
     def test_known_model_basic(self):
         """Calculate cost for a known model with basic tokens."""
         cost = calculate_cost(
-            model_id="claude-sonnet-4-5",
+            model_id="claude-sonnet-4-6",
             input_tokens=1_000_000,
             output_tokens=1_000_000,
         )
@@ -204,13 +204,13 @@ class TestCalculateCost:
 
     def test_zero_tokens(self):
         """Zero tokens gives zero cost."""
-        cost = calculate_cost(model_id="claude-sonnet-4-5")
+        cost = calculate_cost(model_id="claude-sonnet-4-6")
         assert cost == 0.0
 
     def test_cache_tokens(self):
         """Cache tokens are included in cost."""
         cost = calculate_cost(
-            model_id="claude-sonnet-4-5",
+            model_id="claude-sonnet-4-6",
             cache_creation_tokens=1_000_000,
             cache_read_tokens=1_000_000,
         )
@@ -220,7 +220,7 @@ class TestCalculateCost:
     def test_reasoning_tokens(self):
         """Reasoning tokens are included in cost."""
         cost = calculate_cost(
-            model_id="claude-sonnet-4-5",
+            model_id="claude-sonnet-4-6",
             reasoning_tokens=1_000_000,
         )
         # Reasoning: 1M * $15/M = $15
@@ -229,7 +229,7 @@ class TestCalculateCost:
     def test_all_token_types(self):
         """All token types contribute to cost."""
         cost = calculate_cost(
-            model_id="claude-sonnet-4-5",
+            model_id="claude-sonnet-4-6",
             input_tokens=1_000_000,
             output_tokens=1_000_000,
             cache_creation_tokens=1_000_000,
@@ -240,7 +240,7 @@ class TestCalculateCost:
         assert abs(cost - expected) < 0.01
 
     def test_unknown_model_falls_back_to_sonnet(self):
-        """Unknown model uses Claude Sonnet 4.5 pricing."""
+        """Unknown model uses Claude Sonnet 4.6 pricing."""
         with patch("reverse_api.pricing._get_pricing_from_litellm", return_value=None):
             cost = calculate_cost(
                 model_id="unknown-model",
@@ -250,7 +250,7 @@ class TestCalculateCost:
             assert abs(cost - 3.0) < 0.01
 
     def test_none_model_falls_back_to_sonnet(self):
-        """None model uses Claude Sonnet 4.5 pricing."""
+        """None model uses Claude Sonnet 4.6 pricing."""
         cost = calculate_cost(
             model_id=None,
             input_tokens=1_000_000,
@@ -277,7 +277,7 @@ class TestCalculateCost:
     def test_small_token_counts(self):
         """Small token counts give proportional costs."""
         cost = calculate_cost(
-            model_id="claude-sonnet-4-5",
+            model_id="claude-sonnet-4-6",
             input_tokens=1000,
             output_tokens=500,
         )
@@ -286,6 +286,6 @@ class TestCalculateCost:
 
     def test_haiku_cheaper(self):
         """Haiku model should be cheaper for same tokens."""
-        sonnet_cost = calculate_cost("claude-sonnet-4-5", input_tokens=1_000_000, output_tokens=1_000_000)
+        sonnet_cost = calculate_cost("claude-sonnet-4-6", input_tokens=1_000_000, output_tokens=1_000_000)
         haiku_cost = calculate_cost("claude-haiku-4-5", input_tokens=1_000_000, output_tokens=1_000_000)
         assert haiku_cost < sonnet_cost

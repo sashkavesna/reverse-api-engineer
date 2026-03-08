@@ -148,8 +148,8 @@ class TestOpenCodeEngineerModelMap:
 
     def test_model_map(self):
         """MODEL_MAP has expected entries."""
-        assert OpenCodeEngineer.MODEL_MAP["sonnet"] == "claude-sonnet-4-5"
-        assert OpenCodeEngineer.MODEL_MAP["opus"] == "claude-opus-4-5"
+        assert OpenCodeEngineer.MODEL_MAP["sonnet"] == "claude-sonnet-4-6"
+        assert OpenCodeEngineer.MODEL_MAP["opus"] == "claude-opus-4-6"
         assert OpenCodeEngineer.MODEL_MAP["haiku"] == "claude-haiku-4-5"
 
 
@@ -170,10 +170,10 @@ class TestOpenCodeEngineerInit:
                         prompt="test prompt",
                         output_dir=str(tmp_path),
                         opencode_provider="anthropic",
-                        opencode_model="claude-opus-4-5",
+                        opencode_model="claude-opus-4-6",
                     )
                     assert eng.opencode_provider == "anthropic"
-                    assert eng.opencode_model == "claude-opus-4-5"
+                    assert eng.opencode_model == "claude-opus-4-6"
                     assert eng._session_id is None
 
     def test_init_default_opencode_kwargs(self, tmp_path):
@@ -191,7 +191,7 @@ class TestOpenCodeEngineerInit:
                         output_dir=str(tmp_path),
                     )
                     assert eng.opencode_provider == "anthropic"
-                    assert eng.opencode_model == "claude-opus-4-5"
+                    assert eng.opencode_model == "claude-opus-4-6"
 
 
 class TestOpenCodeEngineerAuth:
@@ -1201,7 +1201,7 @@ class TestOpenCodeEngineerAnalyzeAndGenerate:
         messages_response.status_code = 200
         messages_response.json.return_value = [
             {
-                "info": {"role": "assistant", "providerID": "anthropic", "modelID": "claude-sonnet-4-5"},
+                "info": {"role": "assistant", "providerID": "anthropic", "modelID": "claude-sonnet-4-6"},
                 "parts": [{"type": "text", "text": "Here is the API client."}],
             }
         ]

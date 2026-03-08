@@ -26,7 +26,7 @@ class TestCollectorUI:
     def test_header(self):
         """Header displays collector info."""
         ui, console = self._make_ui()
-        ui.header("run123", "collect startup data", "claude-sonnet-4-5")
+        ui.header("run123", "collect startup data", "claude-sonnet-4-6")
         output = console.file.getvalue()
         assert "run123" in output
         assert "collect startup data" in output
@@ -35,7 +35,7 @@ class TestCollectorUI:
         """Header truncates prompts longer than 80 chars."""
         ui, console = self._make_ui()
         long_prompt = "x" * 100
-        ui.header("run123", long_prompt, "claude-sonnet-4-5")
+        ui.header("run123", long_prompt, "claude-sonnet-4-6")
         output = console.file.getvalue()
         assert "..." in output
 

@@ -261,7 +261,7 @@ def prompt_interactive_options(
         return {
             "mode": result_mode,
             "run_id": prompt,
-            "model": model or config_manager.get("claude_code_model", "claude-sonnet-4-5"),
+            "model": model or config_manager.get("claude_code_model", "claude-sonnet-4-6"),
         }
 
     # Agent mode: similar to manual but uses autonomous browser
@@ -285,7 +285,7 @@ def prompt_interactive_options(
                 raise click.Abort()
 
         if model is None:
-            model = config_manager.get("claude_code_model", "claude-sonnet-4-5")
+            model = config_manager.get("claude_code_model", "claude-sonnet-4-6")
 
         return {
             "mode": result_mode,
@@ -298,7 +298,7 @@ def prompt_interactive_options(
     # Collector mode: just needs prompt
     if result_mode == "collector":
         if model is None:
-            model = config_manager.get("collector_model", "claude-sonnet-4-5")
+            model = config_manager.get("collector_model", "claude-sonnet-4-6")
 
         return {
             "mode": result_mode,
@@ -330,7 +330,7 @@ def prompt_interactive_options(
         reverse_engineer = True
 
     if model is None:
-        model = config_manager.get("claude_code_model", "claude-sonnet-4-5")
+        model = config_manager.get("claude_code_model", "claude-sonnet-4-6")
 
     return {
         "mode": result_mode,
@@ -356,9 +356,9 @@ def repl_loop():
     # Get current SDK and model from config
     sdk = config_manager.get("sdk", "claude")
     if sdk == "opencode":
-        model = config_manager.get("opencode_model", "claude-opus-4-5")
+        model = config_manager.get("opencode_model", "claude-opus-4-6")
     else:
-        model = config_manager.get("claude_code_model", "claude-sonnet-4-5")
+        model = config_manager.get("claude_code_model", "claude-sonnet-4-6")
 
     display_banner(console, sdk=sdk, model=model)
     console.print("  [dim]shift+tab to cycle modes: manual | engineer | agent | collector[/dim]")
@@ -691,11 +691,11 @@ def handle_settings(mode_color=THEME_PRIMARY):
                 console.print(f" [dim]updated[/dim] opencode provider: {new_provider}\n")
 
     elif action == "opencode_model":
-        current = config_manager.get("opencode_model", "claude-opus-4-5")
+        current = config_manager.get("opencode_model", "claude-opus-4-6")
         new_model = questionary.text(
             " > opencode model",
-            default=current or "claude-opus-4-5",
-            instruction="(e.g., 'claude-sonnet-4-5', 'claude-opus-4-5')",
+            default=current or "claude-opus-4-6",
+            instruction="(e.g., 'claude-sonnet-4-6', 'claude-opus-4-6')",
             qmark="",
             style=questionary.Style(
                 [
@@ -754,7 +754,7 @@ def handle_settings(mode_color=THEME_PRIMARY):
 
         current = config_manager.get("stagehand_model", "openai/computer-use-preview-2025-03-11")
         instruction = (
-            "(Format: 'openai/model' or 'anthropic/model', e.g., 'openai/computer-use-preview-2025-03-11' or 'anthropic/claude-sonnet-4-5-20250929')"
+            "(Format: 'openai/model' or 'anthropic/model', e.g., 'openai/computer-use-preview-2025-03-11' or 'anthropic/claude-sonnet-4-6-20260301')"
         )
 
         new_model = questionary.text(
@@ -784,9 +784,9 @@ def handle_settings(mode_color=THEME_PRIMARY):
                     console.print(
                         " [dim]Valid formats for stagehand:[/dim]\n"
                         " [dim]  - openai/computer-use-preview-2025-03-11[/dim]\n"
-                        " [dim]  - anthropic/claude-sonnet-4-5-20250929[/dim]\n"
+                        " [dim]  - anthropic/claude-sonnet-4-6-20260301[/dim]\n"
                         " [dim]  - anthropic/claude-haiku-4-5-20251001[/dim]\n"
-                        " [dim]  - anthropic/claude-opus-4-5-20251101[/dim]\n"
+                        " [dim]  - anthropic/claude-opus-4-6-20260301[/dim]\n"
                     )
 
     elif action == "real_time_sync":
@@ -895,7 +895,7 @@ def handle_history(mode_color=THEME_PRIMARY):
         console.print()
 
         if questionary.confirm(" > recode?", qmark="").ask():
-            model = run.get("model") or config_manager.get("claude_code_model", "claude-sonnet-4-5")
+            model = run.get("model") or config_manager.get("claude_code_model", "claude-sonnet-4-6")
             run_engineer(run_id, model=model)
     else:
         console.print(" [dim]> not found[/dim]")
@@ -1145,7 +1145,7 @@ def handle_messages(run_id: str, mode_color=THEME_PRIMARY):
 @click.option(
     "--model",
     "-m",
-    type=click.Choice(["claude-sonnet-4-5", "claude-opus-4-5", "claude-haiku-4-5"]),
+    type=click.Choice(["claude-sonnet-4-6", "claude-opus-4-6", "claude-haiku-4-5"]),
     default=None,
 )
 @click.option("--output-dir", "-o", default=None, help="Custom output directory.")
@@ -1377,7 +1377,7 @@ def run_collector(prompt=None, model=None, output_dir=None):
 
     # Use collector model from config if not specified
     if model is None:
-        model = config_manager.get("collector_model", "claude-sonnet-4-5")
+        model = config_manager.get("collector_model", "claude-sonnet-4-6")
 
     # Initialize session
     session_manager.add_run(
@@ -1459,7 +1459,7 @@ def run_auto_capture(prompt=None, url=None, model=None, output_dir=None):
                 prompt=prompt,
                 output_dir=output_dir,
                 opencode_provider=config_manager.get("opencode_provider", "anthropic"),
-                opencode_model=config_manager.get("opencode_model", "claude-opus-4-5"),
+                opencode_model=config_manager.get("opencode_model", "claude-opus-4-6"),
                 enable_sync=config_manager.get("real_time_sync", False),
                 sdk=sdk,
                 output_language=output_language,
@@ -1470,7 +1470,7 @@ def run_auto_capture(prompt=None, url=None, model=None, output_dir=None):
             engineer = ClaudeAutoEngineer(
                 run_id=run_id,
                 prompt=prompt,
-                model=model or config_manager.get("claude_code_model", "claude-sonnet-4-5"),
+                model=model or config_manager.get("claude_code_model", "claude-sonnet-4-6"),
                 output_dir=output_dir,
                 enable_sync=config_manager.get("real_time_sync", False),
                 sdk=sdk,
@@ -1550,7 +1550,7 @@ def run_playwright_codegen(run_id: str, prompt: str, output_dir: str | None = No
 @click.option(
     "--model",
     "-m",
-    type=click.Choice(["claude-sonnet-4-5", "claude-opus-4-5", "claude-haiku-4-5"]),
+    type=click.Choice(["claude-sonnet-4-6", "claude-opus-4-6", "claude-haiku-4-5"]),
     default=None,
 )
 @click.option("--output-dir", "-o", default=None, help="Custom output directory.")
@@ -1603,7 +1603,7 @@ def run_engineer(
             output_dir=output_dir,
             sdk=sdk,
             opencode_provider=config_manager.get("opencode_provider", "anthropic"),
-            opencode_model=config_manager.get("opencode_model", "claude-opus-4-5"),
+            opencode_model=config_manager.get("opencode_model", "claude-opus-4-6"),
             enable_sync=enable_sync,
             additional_instructions=additional_instructions,
             is_fresh=is_fresh,
@@ -1615,7 +1615,7 @@ def run_engineer(
             run_id=run_id,
             har_path=har_path,
             prompt=prompt,
-            model=model or config_manager.get("claude_code_model", "claude-sonnet-4-5"),
+            model=model or config_manager.get("claude_code_model", "claude-sonnet-4-6"),
             output_dir=output_dir,
             sdk=sdk,
             enable_sync=enable_sync,

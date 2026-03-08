@@ -21,7 +21,7 @@ class TestClaudeAutoEngineerInit:
                     eng = ClaudeAutoEngineer(
                         run_id="test123",
                         prompt="browse and capture",
-                        model="claude-sonnet-4-5",
+                        model="claude-sonnet-4-6",
                         output_dir=str(tmp_path),
                     )
                     assert eng.mcp_run_id == "test123"
@@ -35,7 +35,7 @@ class TestClaudeAutoEngineerPrompt:
         defaults = {
             "run_id": "test123",
             "prompt": "browse and capture",
-            "model": "claude-sonnet-4-5",
+            "model": "claude-sonnet-4-6",
             "output_dir": str(tmp_path),
         }
         defaults.update(kwargs)
@@ -99,7 +99,7 @@ class TestClaudeAutoEngineerAnalyze:
         defaults = {
             "run_id": "test123",
             "prompt": "browse and capture",
-            "model": "claude-sonnet-4-5",
+            "model": "claude-sonnet-4-6",
             "output_dir": str(tmp_path),
         }
         defaults.update(kwargs)
@@ -452,7 +452,7 @@ class TestOpenCodeAutoEngineerInit:
                             prompt="browse and capture",
                             output_dir=str(tmp_path),
                             opencode_provider="anthropic",
-                            opencode_model="claude-opus-4-5",
+                            opencode_model="claude-opus-4-6",
                         )
                         assert eng.mcp_run_id == "test123"
                         assert eng.mcp_name is None
@@ -468,7 +468,7 @@ class TestOpenCodeAutoEngineerInit:
                             prompt="browse and capture",
                             output_dir=str(tmp_path),
                             opencode_provider="anthropic",
-                            opencode_model="claude-opus-4-5",
+                            opencode_model="claude-opus-4-6",
                         )
                         prompt = eng._build_auto_prompt()
                         assert "browser_navigate" in prompt
@@ -490,7 +490,7 @@ class TestOpenCodeAutoEngineerAnalyze:
                             prompt="browse and capture",
                             output_dir=str(tmp_path),
                             opencode_provider="anthropic",
-                            opencode_model="claude-opus-4-5",
+                            opencode_model="claude-opus-4-6",
                         )
                         eng.scripts_dir = tmp_path / "scripts"
                         eng.scripts_dir.mkdir(parents=True, exist_ok=True)
@@ -658,7 +658,7 @@ class TestOpenCodeAutoEngineerAnalyze:
         mock_messages.status_code = 200
         mock_messages.json.return_value = [
             {
-                "info": {"role": "assistant", "providerID": "anthropic", "modelID": "claude-opus-4-5"},
+                "info": {"role": "assistant", "providerID": "anthropic", "modelID": "claude-opus-4-6"},
                 "parts": [{"type": "text", "text": "API client"}],
             }
         ]
@@ -844,7 +844,7 @@ class TestOpenCodeAutoEngineerAnalyze:
         mock_messages = MagicMock()
         mock_messages.status_code = 200
         mock_messages.json.return_value = [
-            {"info": {"role": "assistant", "providerID": "anthropic", "modelID": "claude-sonnet-4-5"}, "parts": []}
+            {"info": {"role": "assistant", "providerID": "anthropic", "modelID": "claude-sonnet-4-6"}, "parts": []}
         ]
 
         async def mock_get(path, **kwargs):

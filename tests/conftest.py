@@ -30,8 +30,8 @@ def sample_config():
     """Sample configuration data."""
     return {
         "sdk": "claude",
-        "claude_code_model": "claude-sonnet-4-5",
-        "opencode_model": "claude-opus-4-5",
+        "claude_code_model": "claude-sonnet-4-6",
+        "opencode_model": "claude-opus-4-6",
         "opencode_provider": "anthropic",
         "output_dir": None,
     }

@@ -50,7 +50,7 @@ class TestSessionManagerAddRun:
             "run1",
             "test prompt",
             url="https://example.com",
-            model="claude-sonnet-4-5",
+            model="claude-sonnet-4-6",
             mode="agent",
             sdk="claude",
             output_mode="docs",
@@ -59,7 +59,7 @@ class TestSessionManagerAddRun:
         )
         run = sm.history[0]
         assert run["url"] == "https://example.com"
-        assert run["model"] == "claude-sonnet-4-5"
+        assert run["model"] == "claude-sonnet-4-6"
         assert run["mode"] == "agent"
         assert run["sdk"] == "claude"
         assert run["output_mode"] == "docs"
@@ -117,9 +117,9 @@ class TestSessionManagerUpdateRun:
         """Update arbitrary fields for an existing run."""
         sm = SessionManager(history_path)
         sm.add_run("run1", "test")
-        sm.update_run("run1", model="claude-opus-4-5", status="complete")
+        sm.update_run("run1", model="claude-opus-4-6", status="complete")
         run = sm.get_run("run1")
-        assert run["model"] == "claude-opus-4-5"
+        assert run["model"] == "claude-opus-4-6"
         assert run["status"] == "complete"
 
     def test_update_nonexistent_run(self, history_path):

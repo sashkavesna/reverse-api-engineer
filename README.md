@@ -42,7 +42,7 @@ No more manual reverse engineering—just browse, capture, and get clean API cod
 - 🌐 **Browser Automation**: Built on Playwright with stealth mode for realistic browsing
 - 🤖 **Autonomous Agent Mode**: Fully automated browser interaction using AI agents (auto mode with MCP, browser-use, stagehand)
 - 📊 **HAR Recording**: Captures all network traffic in HTTP Archive format
-- 🧠 **AI-Powered Generation**: Uses Claude 4.5 to analyze traffic and generate clean Python code
+- 🧠 **AI-Powered Generation**: Uses Claude 4.6 to analyze traffic and generate clean Python code
 - 🔍 **Collector Mode**: Data collection with automatic JSON/CSV export
 - 🔌 **Multi-SDK Support**: Native integration with Claude and OpenCode SDKs
 - 💻 **Interactive CLI**: Minimalist terminal interface with mode cycling (Shift+Tab)
@@ -85,7 +85,7 @@ playwright install chromium
 
 ### Enhanced Pricing Support (Optional)
 
-By default, Reverse API Engineer includes pricing data for the most common models (Claude 4.5, Gemini 3). For extended model coverage (100+ additional models including OpenAI GPT, Mistral, DeepSeek, and more), install with pricing extras:
+By default, Reverse API Engineer includes pricing data for the most common models (Claude 4.6, Gemini 3). For extended model coverage (100+ additional models including OpenAI GPT, Mistral, DeepSeek, and more), install with pricing extras:
 
 ```bash
 # With uv
@@ -98,7 +98,7 @@ pip install 'reverse-api-engineer[pricing]'
 This enables automatic pricing lookup via [LiteLLM](https://github.com/BerriAI/litellm) for models not in the built-in database. The pricing system uses a 3-tier fallback:
 1. **Local pricing** (highest priority) - Built-in pricing for common models
 2. **LiteLLM pricing** (if installed) - Extended coverage for 100+ models
-3. **Default pricing** (ultimate fallback) - Uses Claude Sonnet 4.5 pricing
+3. **Default pricing** (ultimate fallback) - Uses Claude Sonnet 4.6 pricing
 
 Cost tracking will always work, with or without the pricing extras installed.
 
@@ -191,7 +191,7 @@ Web data collection using Claude Agent SDK:
 - `README.md` - Collection metadata and schema documentation
 
 **Model Configuration:**
-Collector mode uses the `collector_model` setting (default: `claude-sonnet-4-5`). This can be configured in `~/.reverse-api/config.json`.
+Collector mode uses the `collector_model` setting (default: `claude-sonnet-4-6`). This can be configured in `~/.reverse-api/config.json`.
 
 Example workflow:
 ```bash
@@ -245,9 +245,9 @@ Settings stored in `~/.reverse-api/config.json`:
 {
   "agent_provider": "auto",
   "browser_use_model": "bu-llm",
-  "claude_code_model": "claude-sonnet-4-5",
-  "collector_model": "claude-sonnet-4-5",
-  "opencode_model": "claude-sonnet-4-5",
+  "claude_code_model": "claude-sonnet-4-6",
+  "collector_model": "claude-sonnet-4-6",
+  "opencode_model": "claude-sonnet-4-6",
   "opencode_provider": "anthropic",
   "output_dir": null,
   "output_language": "python",
@@ -259,14 +259,14 @@ Settings stored in `~/.reverse-api/config.json`:
 
 ### Model Selection
 
-Choose from Claude 4.5 models for API generation:
-- **Sonnet 4.5** (default): Balanced performance and cost
-- **Opus 4.5**: Maximum capability for complex APIs
+Choose from Claude 4.6 models for API generation:
+- **Sonnet 4.6** (default): Balanced performance and cost
+- **Opus 4.6**: Maximum capability for complex APIs
 - **Haiku 4.5**: Fastest and most economical
 
 Change in `/settings` or via CLI:
 ```bash
-reverse-api-engineer manual --model claude-sonnet-4-5
+reverse-api-engineer manual --model claude-sonnet-4-6
 ```
 
 If you use Opencode, look at the [models](https://models.dev).
@@ -289,9 +289,9 @@ Configure AI agents for autonomous browser automation.
 
 **Stagehand Provider (Computer Use only):**
 - `openai/computer-use-preview-2025-03-11` - Requires `OPENAI_API_KEY`
-- `anthropic/claude-sonnet-4-5-20250929` - Requires `ANTHROPIC_API_KEY`
+- `anthropic/claude-sonnet-4-6-20260301` - Requires `ANTHROPIC_API_KEY`
 - `anthropic/claude-haiku-4-5-20251001` - Requires `ANTHROPIC_API_KEY`
-- `anthropic/claude-opus-4-5-20251101` - Requires `ANTHROPIC_API_KEY`
+- `anthropic/claude-opus-4-6-20260301` - Requires `ANTHROPIC_API_KEY`
 
 **Setting API Keys:**
 ```bash

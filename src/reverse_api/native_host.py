@@ -549,7 +549,7 @@ class NativeHostHandler:
                 "_callbackId": message.get("_callbackId"),
             }
 
-        model = message.get("model") or self.config.get("claude_code_model") or "claude-sonnet-4-5"
+        model = message.get("model") or self.config.get("claude_code_model") or "claude-sonnet-4-6"
         scripts_dir = get_scripts_dir(run_id)
         scripts_dir.mkdir(parents=True, exist_ok=True)
 

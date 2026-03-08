@@ -30,13 +30,13 @@ class TestBaseEngineerInit:
                     run_id="test123",
                     har_path=har_path,
                     prompt="test prompt",
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-6",
                     output_dir=str(tmp_path),
                 )
                 assert engineer.run_id == "test123"
                 assert engineer.har_path == har_path
                 assert engineer.prompt == "test prompt"
-                assert engineer.model == "claude-sonnet-4-5"
+                assert engineer.model == "claude-sonnet-4-6"
                 assert engineer.output_mode == "client"
                 assert engineer.is_fresh is False
                 assert engineer.output_language == "python"

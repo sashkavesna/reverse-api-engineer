@@ -103,15 +103,15 @@ class OpenCodeEngineer(BaseEngineer):
 
     # Map short model names to full Anthropic model IDs
     MODEL_MAP = {
-        "sonnet": "claude-sonnet-4-5",
-        "opus": "claude-opus-4-5",
+        "sonnet": "claude-sonnet-4-6",
+        "opus": "claude-opus-4-6",
         "haiku": "claude-haiku-4-5",
     }
 
     def __init__(self, *args, **kwargs):
         # Pop OpenCode-specific kwargs before passing to parent class
         self.opencode_provider = kwargs.pop("opencode_provider", "anthropic")
-        self.opencode_model = kwargs.pop("opencode_model", "claude-opus-4-5")
+        self.opencode_model = kwargs.pop("opencode_model", "claude-opus-4-6")
 
         super().__init__(*args, **kwargs)
 

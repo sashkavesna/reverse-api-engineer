@@ -189,8 +189,8 @@ class ClaudeUI:
 def get_model_choices() -> list[dict]:
     """Get available model choices for questionary."""
     return [
-        {"name": "Sonnet 4.5 [Balanced]", "value": "claude-sonnet-4-5"},
-        {"name": "Opus 4.5 [Power]", "value": "claude-opus-4-5"},
+        {"name": "Sonnet 4.6 [Balanced]", "value": "claude-sonnet-4-6"},
+        {"name": "Opus 4.6 [Power]", "value": "claude-opus-4-6"},
         {"name": "Haiku 4.5 [Speed]", "value": "claude-haiku-4-5"},
     ]
 

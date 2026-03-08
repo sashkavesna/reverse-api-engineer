@@ -19,10 +19,10 @@ class TestConfigManagerInit:
     def test_loads_existing_config(self, config_path):
         """ConfigManager loads config from existing file."""
         config_path.parent.mkdir(parents=True, exist_ok=True)
-        config_path.write_text(json.dumps({"sdk": "opencode", "claude_code_model": "claude-opus-4-5"}))
+        config_path.write_text(json.dumps({"sdk": "opencode", "claude_code_model": "claude-opus-4-6"}))
         cm = ConfigManager(config_path)
         assert cm.get("sdk") == "opencode"
-        assert cm.get("claude_code_model") == "claude-opus-4-5"
+        assert cm.get("claude_code_model") == "claude-opus-4-6"
 
     def test_ignores_invalid_keys(self, config_path):
         """ConfigManager ignores keys not in DEFAULT_CONFIG."""
@@ -52,9 +52,9 @@ class TestConfigMigration:
     def test_migrate_model_to_claude_code_model(self, config_path):
         """Old 'model' key migrates to 'claude_code_model'."""
         config_path.parent.mkdir(parents=True, exist_ok=True)
-        config_path.write_text(json.dumps({"model": "claude-opus-4-5"}))
+        config_path.write_text(json.dumps({"model": "claude-opus-4-6"}))
         cm = ConfigManager(config_path)
-        assert cm.get("claude_code_model") == "claude-opus-4-5"
+        assert cm.get("claude_code_model") == "claude-opus-4-6"
 
     def test_no_migrate_if_claude_code_model_exists(self, config_path):
         """Migration skipped if 'claude_code_model' already set."""

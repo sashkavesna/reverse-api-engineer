@@ -30,7 +30,7 @@ class TestOpenCodeUI:
     def test_header(self):
         """Header displays info."""
         ui, console = self._make_ui()
-        ui.header("run123", "test prompt", "claude-opus-4-5", "opencode")
+        ui.header("run123", "test prompt", "claude-opus-4-6", "opencode")
         output = console.file.getvalue()
         assert "run123" in output
         assert "test prompt" in output
@@ -38,7 +38,7 @@ class TestOpenCodeUI:
     def test_header_no_sdk(self):
         """Header without sdk."""
         ui, console = self._make_ui()
-        ui.header("run123", "test prompt", "claude-opus-4-5")
+        ui.header("run123", "test prompt", "claude-opus-4-6")
         output = console.file.getvalue()
         assert "run123" in output
 
@@ -66,10 +66,10 @@ class TestOpenCodeUI:
     def test_model_info(self):
         """Model info shows provider/model."""
         ui, console = self._make_ui()
-        ui.model_info("anthropic", "claude-sonnet-4-5")
+        ui.model_info("anthropic", "claude-sonnet-4-6")
         output = console.file.getvalue()
         assert "anthropic" in output
-        assert "claude-sonnet-4-5" in output
+        assert "claude-sonnet-4-6" in output
 
     def test_start_and_stop_streaming(self):
         """Streaming can be started and stopped."""

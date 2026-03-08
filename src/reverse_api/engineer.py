@@ -294,7 +294,7 @@ def run_reverse_engineering(
     Args:
         sdk: "opencode" or "claude" - determines which SDK to use
         opencode_provider: Provider ID for OpenCode (e.g., "anthropic")
-        opencode_model: Model ID for OpenCode (e.g., "claude-sonnet-4-5")
+        opencode_model: Model ID for OpenCode (e.g., "claude-sonnet-4-6")
         enable_sync: Enable real-time file syncing during engineering
         is_fresh: Whether to start fresh (ignore previous scripts)
         output_language: Target language - "python", "javascript", or "typescript"
