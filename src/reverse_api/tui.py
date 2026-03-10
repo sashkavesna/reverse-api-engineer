@@ -113,20 +113,17 @@ class ClaudeUI:
                 if len(output_lines) > max_lines:
                     self.console.print(f"  [dim]│[/dim] [dim]... ({len(output_lines) - max_lines} more lines)[/dim]")
 
-    def thinking(self, text: str, max_length: int = 100) -> None:
+    def thinking(self, text: str, max_length: int = 500) -> None:
         """Display Claude's thinking/response text."""
         if not self.verbose:
             return
 
-        # Only show substantial thinking (skip short status updates)
-        if len(text) < 20:
+        if len(text) < 5:
             return
 
-        # Truncate and clean
-        display_text = text[:max_length].replace("\n", " ").strip()
-        if len(text) > max_length:
-            display_text += "..."
-
+        display_text = text.replace("\n", " ").strip()
+        if len(display_text) > max_length:
+            display_text = display_text[:max_length] + "..."
         self.console.print(f"  [dim].. {display_text}[/dim]")
 
     def progress(self, message: str) -> None:
