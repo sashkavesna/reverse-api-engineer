@@ -1,4 +1,5 @@
 import asyncio
+import json
 import re
 from pathlib import Path
 
@@ -36,6 +37,7 @@ from .utils import (
     generate_folder_name,
     generate_run_id,
     get_actions_path,
+    get_base_output_dir,
     get_config_path,
     get_har_dir,
     get_history_path,
@@ -1728,6 +1730,126 @@ def run_engineer(
             paths={"script_path": result.get("script_path")},
         )
     return result
+
+
+def _get_run_details(run: dict) -> dict:
+    """Enrich a history entry with filesystem info."""
+    run_id = run.get("run_id", "")
+    output_dir = config_manager.get("output_dir")
+    base_dir = get_base_output_dir(output_dir)
+    script_dir = base_dir / "scripts" / run_id
+
+    files = []
+    if script_dir.exists():
+        files = sorted(f.name for f in script_dir.iterdir() if f.is_file())
+
+    # Scan ./scripts/ subdirectories to find local copy
+    local_path = None
+    local_scripts = Path.cwd() / "scripts"
+    if local_scripts.exists() and files:
+        files_set = set(files)
+        for subdir in local_scripts.iterdir():
+            if subdir.is_dir():
+                local_files = {f.name for f in subdir.iterdir() if f.is_file()}
+                if local_files and local_files == files_set:
+                    local_path = f"./scripts/{subdir.name}/"
+                    break
+
+    usage = run.get("usage", {})
+    cost = usage.get("total_cost", usage.get("cost"))
+
+    return {
+        "run_id": run_id,
+        "prompt": run.get("prompt", ""),
+        "timestamp": run.get("timestamp", ""),
+        "model": run.get("model", ""),
+        "mode": run.get("mode", ""),
+        "sdk": run.get("sdk", ""),
+        "cost": cost,
+        "script_dir": str(script_dir),
+        "files": files,
+        "file_count": len(files),
+        "local_path": local_path,
+    }
+
+
+@main.command("list")
+@click.option("--json", "as_json", is_flag=True, help="Output as flat JSON array.")
+@click.option("--full", is_flag=True, help="Show all columns (default: compact view).")
+@click.option("--limit", "-n", type=int, default=None, help="Limit number of results.")
+@click.option("--mode", "-m", type=str, default=None, help="Filter by mode (auto/manual/agent/engineer/collector).")
+@click.option("--model", type=str, default=None, help="Filter by model name.")
+@click.option("--search", "-s", type=str, default=None, help="Case-insensitive substring match on prompt.")
+def list_runs(as_json, full, limit, mode, model, search):
+    """List generated scripts and runs with optional filters."""
+    from rich.table import Table
+
+    runs = list(session_manager.history)
+
+    if mode:
+        runs = [r for r in runs if r.get("mode", "") == mode]
+    if model:
+        runs = [r for r in runs if model.lower() in (r.get("model") or "").lower()]
+    if search:
+        runs = [r for r in runs if search.lower() in (r.get("prompt") or "").lower()]
+
+    if not runs:
+        if not session_manager.history:
+            console.print("No runs found.", style="dim")
+        else:
+            console.print("No matching runs found.")
+        return
+
+    if limit is not None:
+        runs = runs[:limit]
+
+    results = [_get_run_details(r) for r in runs]
+
+    if as_json:
+        click.echo(json.dumps(results, indent=2))
+        return
+
+    if full:
+        table = Table(show_lines=False)
+        table.add_column("run_id", style="cyan")
+        table.add_column("prompt", max_width=40)
+        table.add_column("timestamp")
+        table.add_column("model")
+        table.add_column("mode")
+        table.add_column("sdk")
+        table.add_column("cost", justify="right")
+        table.add_column("script_dir")
+        table.add_column("files", justify="right")
+        for r in results:
+            prompt = r["prompt"][:40] + ("..." if len(r["prompt"]) > 40 else "")
+            cost_str = f"${r['cost']:.2f}" if r["cost"] is not None else ""
+            table.add_row(
+                r["run_id"],
+                prompt,
+                r["timestamp"],
+                r["model"] or "",
+                r["mode"] or "",
+                r["sdk"] or "",
+                cost_str,
+                r["script_dir"],
+                str(r["file_count"]),
+            )
+    else:
+        table = Table(show_lines=False)
+        table.add_column("run_id", style="cyan")
+        table.add_column("prompt", max_width=40)
+        table.add_column("timestamp")
+        table.add_column("script_dir")
+        for r in results:
+            prompt = r["prompt"][:40] + ("..." if len(r["prompt"]) > 40 else "")
+            table.add_row(
+                r["run_id"],
+                prompt,
+                r["timestamp"],
+                r["script_dir"],
+            )
+
+    console.print(table)
 
 
 @main.command("install-host")
