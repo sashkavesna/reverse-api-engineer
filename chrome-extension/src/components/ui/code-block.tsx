@@ -1,8 +1,19 @@
 
 
 import { type FC, useState } from "react";
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import python from 'react-syntax-highlighter/dist/esm/languages/prism/python';
+import bash from 'react-syntax-highlighter/dist/esm/languages/prism/bash';
+import json from 'react-syntax-highlighter/dist/esm/languages/prism/json';
+import javascript from 'react-syntax-highlighter/dist/esm/languages/prism/javascript';
+import typescript from 'react-syntax-highlighter/dist/esm/languages/prism/typescript';
+
+SyntaxHighlighter.registerLanguage('python', python);
+SyntaxHighlighter.registerLanguage('bash', bash);
+SyntaxHighlighter.registerLanguage('json', json);
+SyntaxHighlighter.registerLanguage('javascript', javascript);
+SyntaxHighlighter.registerLanguage('typescript', typescript);
 import {
 	Copy01Icon,
 	Download01Icon,
@@ -240,12 +251,15 @@ export const CodeBlock: FC<CodeBlockProps> = ({
 						language={mappedLang}
 						style={vscDarkPlus}
 						showLineNumbers={showLineNumbers}
+						wrapLongLines
 						customStyle={{
 							margin: 0,
 							padding: '1rem',
 							background: 'transparent',
 							fontSize: '14px',
 							lineHeight: '1.5',
+							overflowX: 'hidden',
+							wordBreak: 'break-all',
 						}}
 						codeTagProps={{
 							style: {

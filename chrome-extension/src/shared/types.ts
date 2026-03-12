@@ -85,6 +85,10 @@ export type MessageType =
   | { type: 'setMode'; mode: AppMode }
   | { type: 'startCodegen' }
   | { type: 'stopCodegen' }
+  | { type: 'clearTraffic' }
+  | { type: 'getCapturedRequests' }
+  | { type: 'getTabInfo' }
+  | { type: 'saveMessages'; messages: ChatMessage[] }
 
 export interface CaptureEvent {
   type: 'complete' | 'failed' | 'started'

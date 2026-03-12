@@ -1,6 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Button } from '@base-ui/react/button'
-import { Tooltip } from '@base-ui/react/tooltip'
 import { AgentAction } from '../components/agent-action'
 import { ChatInput } from '../components/chat-input'
 import { SessionSelector } from '../components/session-selector'
@@ -14,12 +12,25 @@ interface ChatMessage {
   role: 'user' | 'assistant'
   content?: string
   events?: AgentEvent[]
+  timestamp?: string
 }
 
 interface ExtendedAppState extends AppState {
   sessions?: Session[]
   codegenActive?: boolean
   codegenScript?: string
+  currentTabUrl?: string
+}
+
+interface CapturedRequest {
+  id: string
+  method: string
+  url: string
+  status?: number
+  statusText?: string
+  type: string
+  time: number
+  size: number
 }
 
 const DEFAULT_STATE: ExtendedAppState = {
@@ -51,14 +62,29 @@ export function SidePanel() {
   const [codegenSavedPath, setCodegenSavedPath] = useState<string | null>(null)
   const [codegenVisiblePath, setCodegenVisiblePath] = useState<string | null>(null)
   const [codegenVisibleDirectory, setCodegenVisibleDirectory] = useState<string | null>(null)
-  const [showSettings, setShowSettings] = useState(false)
+  const [showTrafficList, setShowTrafficList] = useState(false)
+  const [capturedRequests, setCapturedRequests] = useState<CapturedRequest[]>([])
+  const [isRestrictedPage, setIsRestrictedPage] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const currentResponseIdRef = useRef<string | null>(null)
   const warningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const showTrafficListRef = useRef(false)
+  showTrafficListRef.current = showTrafficList
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [])
+
+  const checkRestrictedUrl = useCallback((url: string) => {
+    if (!url) { setIsRestrictedPage(true); return }
+    const restrictedProtocols = ['chrome:', 'chrome-extension:', 'edge:', 'about:', 'data:', 'file:', 'view-source:']
+    try {
+      const urlObj = new URL(url)
+      setIsRestrictedPage(restrictedProtocols.includes(urlObj.protocol))
+    } catch {
+      setIsRestrictedPage(true)
+    }
   }, [])
 
   // Initialize: load state and settings
@@ -71,6 +97,7 @@ export function SidePanel() {
         ])
         if (stateRes) {
           setState(prev => ({ ...prev, ...stateRes }))
+          if (stateRes.currentTabUrl) checkRestrictedUrl(stateRes.currentTabUrl)
 
           // Load active session's data including messages and codegen info
           const sessions = stateRes.sessions as Session[] | undefined
@@ -88,7 +115,28 @@ export function SidePanel() {
       }
     }
     init()
-  }, [])
+  }, [checkRestrictedUrl])
+
+  // Listen for tab changes to detect restricted pages
+  useEffect(() => {
+    const handleTabActivated = () => {
+      chrome.runtime.sendMessage({ type: 'getTabInfo' }).then(res => {
+        if (res) checkRestrictedUrl(res.url)
+      }).catch(() => {})
+    }
+    const handleTabUpdated = (_tabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
+      if (changeInfo.url || changeInfo.status === 'complete') {
+        handleTabActivated()
+      }
+    }
+
+    chrome.tabs.onActivated.addListener(handleTabActivated)
+    chrome.tabs.onUpdated.addListener(handleTabUpdated)
+    return () => {
+      chrome.tabs.onActivated.removeListener(handleTabActivated)
+      chrome.tabs.onUpdated.removeListener(handleTabUpdated)
+    }
+  }, [checkRestrictedUrl])
 
   // Cleanup warning timeout on unmount
   useEffect(() => {
@@ -106,6 +154,12 @@ export function SidePanel() {
           chrome.runtime.sendMessage({ type: 'getState' }).then(res => {
             if (res) setState(prev => ({ ...prev, ...res }))
           })
+          // Refresh request list if it's open
+          if (showTrafficListRef.current) {
+            chrome.runtime.sendMessage({ type: 'getCapturedRequests' }).then(res => {
+              if (Array.isArray(res)) setCapturedRequests(res as CapturedRequest[])
+            }).catch(() => {})
+          }
           break
         case 'agentEvent':
           handleAgentEvent(message.event as AgentEvent)
@@ -136,6 +190,13 @@ export function SidePanel() {
               }
             }
           })
+          break
+        case 'trafficCleared':
+          chrome.runtime.sendMessage({ type: 'getState' }).then(res => {
+            if (res) setState(prev => ({ ...prev, ...res }))
+          })
+          setCapturedRequests([])
+          setShowTrafficList(false)
           break
         case 'modeChanged':
           if (message.mode) {
@@ -211,10 +272,15 @@ export function SidePanel() {
       })
     })
 
-    // Handle done/error events
+    // Handle done/error events — persist messages when response completes
     if (event.event_type === 'done' || event.event_type === 'error') {
       currentResponseIdRef.current = null
       setState(prev => ({ ...prev, isStreaming: false, current_task: null }))
+      // Read latest messages and persist
+      setMessages(prev => {
+        chrome.runtime.sendMessage({ type: 'saveMessages', messages: prev }).catch(() => {})
+        return prev
+      })
     }
   }, [])
 
@@ -223,13 +289,44 @@ export function SidePanel() {
       if (state.capturing) {
         await chrome.runtime.sendMessage({ type: 'stopCapture' })
       } else {
+        if (isRestrictedPage) {
+          showWarning('Navigate to a website first (http:// or https://)')
+          return
+        }
         await chrome.runtime.sendMessage({ type: 'startCapture' })
       }
       const res = await chrome.runtime.sendMessage({ type: 'getState' })
       if (res) setState(prev => ({ ...prev, ...res }))
     } catch (err) {
       console.error('Capture error:', err)
+      showWarning((err as Error).message || 'Failed to start capture')
     }
+  }
+
+  const handleClearTraffic = async () => {
+    try {
+      await chrome.runtime.sendMessage({ type: 'clearTraffic' })
+      const res = await chrome.runtime.sendMessage({ type: 'getState' })
+      if (res) setState(prev => ({ ...prev, ...res }))
+      setCapturedRequests([])
+      setShowTrafficList(false)
+    } catch (err) {
+      showWarning((err as Error).message || 'Failed to clear traffic')
+    }
+  }
+
+  const loadCapturedRequests = async () => {
+    try {
+      const res = await chrome.runtime.sendMessage({ type: 'getCapturedRequests' })
+      if (Array.isArray(res)) setCapturedRequests(res as CapturedRequest[])
+    } catch (err) {
+      console.error('Failed to load requests:', err)
+    }
+  }
+
+  const toggleTrafficList = () => {
+    if (!showTrafficList) loadCapturedRequests()
+    setShowTrafficList(prev => !prev)
   }
 
   const checkNativeHost = async () => {
@@ -249,6 +346,10 @@ export function SidePanel() {
     }, 3000)
   }
 
+  const persistMessages = useCallback((msgs: ChatMessage[]) => {
+    chrome.runtime.sendMessage({ type: 'saveMessages', messages: msgs }).catch(() => {})
+  }, [])
+
   const sendMessage = async (message: string) => {
     if (!message.trim()) return
 
@@ -267,7 +368,8 @@ export function SidePanel() {
       return
     }
 
-    // Clear current task when starting new query
+    // Reset response tracking for the new query
+    currentResponseIdRef.current = null
     setState(prev => ({ ...prev, current_task: null }))
 
     // Add user message
@@ -275,8 +377,13 @@ export function SidePanel() {
       id: `user-${Date.now()}`,
       role: 'user',
       content: message,
+      timestamp: new Date().toISOString(),
     }
-    setMessages(prev => [...prev, userMsg])
+    setMessages(prev => {
+      const updated = [...prev, userMsg]
+      persistMessages(updated)
+      return updated
+    })
     setInputValue('')
     setWarningMessage(null)
     setState(prev => ({ ...prev, isStreaming: true }))
@@ -425,71 +532,35 @@ export function SidePanel() {
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
-          {/* Icon-based Trigger Button */}
-          <Tooltip.Root>
-            <Tooltip.Trigger
-              render={
-                <Button
-                  onClick={state.mode === 'capture' ? toggleCapture : toggleCodegen}
-                  className={`p-1.5 rounded-lg cursor-pointer transition-all duration-200 ${isActive
-                      ? state.mode === 'capture'
-                        ? 'text-capture bg-capture/10 hover:bg-capture/20'
-                        : 'text-codegen bg-codegen/10 hover:bg-codegen/20'
-                      : 'text-white/60 hover:text-white hover:bg-white/10'
-                    }`}
-                  aria-label={
-                    state.mode === 'capture'
-                      ? state.capturing ? 'Stop capture' : 'Start capture'
-                      : state.codegenActive ? 'Stop recording' : 'Start recording'
-                  }
-                >
-                  {isActive ? (
-                    <StopIcon className="w-4 h-4" />
-                  ) : (
-                    <PlayIcon className="w-4 h-4" />
-                  )}
-                </Button>
-              }
-            />
-            <Tooltip.Portal>
-              <Tooltip.Positioner sideOffset={4}>
-                <Tooltip.Popup className="bg-background-elevated text-white text-caption px-2 py-1 rounded-lg z-[100] font-mono">
-                  {state.mode === 'capture'
-                    ? state.capturing
-                      ? `Stop recording (${state.stats.total} requests)`
-                      : 'Start recording traffic'
-                    : state.codegenActive
-                      ? 'Stop code generation'
-                      : 'Start generating code'}
-                </Tooltip.Popup>
-              </Tooltip.Positioner>
-            </Tooltip.Portal>
-          </Tooltip.Root>
-
-          {/* Settings Button */}
-          <Tooltip.Root>
-            <Tooltip.Trigger
-              render={
-                <Button
-                  onClick={() => setShowSettings(true)}
-                  className="p-1.5 rounded-lg cursor-pointer transition-all duration-200 text-white/60 hover:text-white hover:bg-white/10"
-                  aria-label="Open settings"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </Button>
-              }
-            />
-            <Tooltip.Portal>
-              <Tooltip.Positioner sideOffset={4}>
-                <Tooltip.Popup className="bg-background-elevated text-white text-caption px-2 py-1 rounded-lg z-[100] font-mono">
-                  Settings
-                </Tooltip.Popup>
-              </Tooltip.Positioner>
-            </Tooltip.Portal>
-          </Tooltip.Root>
+          <button
+            onClick={state.mode === 'capture' ? toggleCapture : toggleCodegen}
+            className={`p-1.5 rounded-lg cursor-pointer transition-all duration-200 ${isActive
+                ? state.mode === 'capture'
+                  ? 'text-capture bg-capture/10 hover:bg-capture/20'
+                  : 'text-codegen bg-codegen/10 hover:bg-codegen/20'
+                : 'text-white/60 hover:text-white hover:bg-white/10'
+              }`}
+            title={
+              state.mode === 'capture'
+                ? state.capturing
+                  ? `Stop recording (${state.stats.total} requests)`
+                  : 'Start recording traffic'
+                : state.codegenActive
+                  ? 'Stop code generation'
+                  : 'Start generating code'
+            }
+            aria-label={
+              state.mode === 'capture'
+                ? state.capturing ? 'Stop capture' : 'Start capture'
+                : state.codegenActive ? 'Stop recording' : 'Start recording'
+            }
+          >
+            {isActive ? (
+              <StopIcon className="w-4 h-4" />
+            ) : (
+              <PlayIcon className="w-4 h-4" />
+            )}
+          </button>
         </div>
       </header>
 
@@ -506,23 +577,93 @@ export function SidePanel() {
                   reverse-api-engineer install-host
                 </code>
               </p>
-              <Button
+              <button
                 onClick={checkNativeHost}
                 className="mt-2 text-caption text-white hover:text-capture transition-colors font-bold underline cursor-pointer"
                 aria-label="Retry connection to native host"
               >
                 {'>'} Retry connection
-              </Button>
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Traffic Count indicator (when capturing) */}
+      {/* Restricted page warning */}
+      {isRestrictedPage && !state.capturing && state.mode === 'capture' && (
+        <div className="mx-4 mt-4 p-3 bg-capture/5 rounded-xl border border-capture/10">
+          <div className="flex items-start gap-3">
+            <WarningIcon />
+            <div className="flex-1 min-w-0">
+              <p className="text-small font-bold text-capture uppercase tracking-tight">Cannot record here</p>
+              <p className="text-caption text-text-secondary mt-1 leading-relaxed">
+                Navigate to a website (http:// or https://) to start recording.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Traffic panel */}
       {state.mode === 'capture' && state.stats.total > 0 && (
-        <div className="px-4 pt-4 pb-0 flex justify-end">
-          <div className="text-tiny text-text-secondary px-2 py-0.5 rounded-full bg-muted border border-border">
-            Traffic captured: <span className="text-white font-bold">{state.stats.total}</span>
+        <div className="mx-4 mt-4">
+          <div className="rounded-xl border border-border bg-muted/50 overflow-hidden">
+            {/* Traffic header row */}
+            <div className="flex items-center justify-between px-3 py-2">
+              <button
+                onClick={toggleTrafficList}
+                className="flex items-center gap-2 text-tiny text-text-secondary hover:text-white transition-colors cursor-pointer"
+              >
+                <svg
+                  className={`w-3 h-3 transition-transform duration-200 ${showTrafficList ? 'rotate-90' : ''}`}
+                  fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+                Traffic captured: <span className="text-white font-bold">{state.stats.total}</span>
+              </button>
+              <button
+                onClick={handleClearTraffic}
+                disabled={state.capturing}
+                className="text-tiny text-text-secondary hover:text-capture transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed px-1.5 py-0.5 rounded hover:bg-capture/10"
+                title={state.capturing ? 'Stop capture before clearing' : 'Clear captured traffic'}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Expandable request list */}
+            {showTrafficList && (
+              <div className="border-t border-border max-h-60 overflow-y-auto custom-scrollbar">
+                {capturedRequests.length === 0 ? (
+                  <div className="px-3 py-4 text-center text-tiny text-text-secondary">
+                    No requests recorded yet
+                  </div>
+                ) : (
+                  capturedRequests.map((req, idx) => {
+                    let urlPath = req.url
+                    try { urlPath = new URL(req.url).pathname + new URL(req.url).search } catch { /* use full url */ }
+                    const statusColor = !req.status ? 'text-text-secondary'
+                      : req.status < 300 ? 'text-green-400'
+                      : req.status < 400 ? 'text-amber-400'
+                      : 'text-red-400'
+                    return (
+                      <div
+                        key={req.id || idx}
+                        className="flex items-center gap-2 px-3 py-1.5 text-tiny border-t border-border/50 first:border-t-0 hover:bg-white/5"
+                      >
+                        <span className="font-bold text-primary w-10 flex-shrink-0 text-right">{req.method}</span>
+                        <span className={`w-8 flex-shrink-0 text-right ${statusColor}`}>{req.status || '-'}</span>
+                        <span className="text-text-secondary truncate flex-1 font-mono" title={req.url}>{urlPath}</span>
+                        <span className="text-text-secondary/50 flex-shrink-0 w-10 text-right">{req.type?.toLowerCase()}</span>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -597,7 +738,7 @@ export function SidePanel() {
       ) : (
         /* Capture Mode - Show chat area */
         <>
-          <div className="flex-1 overflow-y-auto px-6 pb-4 pt-6 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 pb-4 pt-6 custom-scrollbar">
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full">
                 <div className="w-24 h-24 text-white/10">
@@ -680,89 +821,6 @@ export function SidePanel() {
         </>
       )}
 
-      {/* Settings Modal */}
-      {showSettings && (
-        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="bg-background border border-border rounded-xl p-6 w-80 max-w-[90vw] shadow-2xl">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-white">Settings</h2>
-              <button
-                onClick={() => setShowSettings(false)}
-                className="text-white/60 hover:text-white p-1"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Save Location Setting */}
-            <div className="space-y-3">
-              <label className="text-sm text-white/80 block">Save Location</label>
-              
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="saveLocation"
-                    checked={settings.saveLocation === 'downloads'}
-                    onChange={() => {
-                      const newSettings = { ...settings, saveLocation: 'downloads' as const }
-                      setSettings(newSettings)
-                      chrome.runtime.sendMessage({ type: 'saveSettings', settings: newSettings })
-                    }}
-                    className="w-4 h-4 accent-primary"
-                  />
-                  <span className="text-sm text-white/70">Downloads folder (default)</span>
-                </label>
-                
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="saveLocation"
-                    checked={settings.saveLocation !== 'downloads'}
-                    onChange={() => {
-                      if (settings.saveLocation === 'downloads') {
-                        const newSettings = { ...settings, saveLocation: '/Users/' }
-                        setSettings(newSettings)
-                        chrome.runtime.sendMessage({ type: 'saveSettings', settings: newSettings })
-                      }
-                    }}
-                    className="w-4 h-4 accent-primary"
-                  />
-                  <span className="text-sm text-white/70">Custom folder</span>
-                </label>
-              </div>
-
-              {settings.saveLocation !== 'downloads' && (
-                <div className="mt-2 p-2 bg-background-elevated rounded-lg">
-                  <div className="text-xs text-white/50 mb-1">Custom path:</div>
-                  <input
-                    type="text"
-                    value={settings.saveLocation}
-                    onChange={(e) => {
-                      const newSettings = { ...settings, saveLocation: e.target.value }
-                      setSettings(newSettings)
-                      chrome.runtime.sendMessage({ type: 'saveSettings', settings: newSettings })
-                    }}
-                    className="w-full text-xs text-white/80 font-mono bg-background border border-white/10 rounded px-2 py-1 focus:outline-none focus:border-primary"
-                    placeholder="/Users/..."
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className="mt-6 pt-4 border-t border-border">
-              <button
-                onClick={() => setShowSettings(false)}
-                className="w-full py-2 bg-primary/20 hover:bg-primary/30 text-primary rounded-lg text-sm font-medium transition-colors"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

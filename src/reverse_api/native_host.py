@@ -147,6 +147,63 @@ def _check_python_version(python_path: str, min_version: tuple[int, int]) -> boo
     return False
 
 
+def _preflight_claude_cli() -> str | None:
+    """
+    Run a preflight check on the Claude CLI to trigger any macOS Gatekeeper
+    prompts in the terminal (where the user can approve them).
+
+    When Claude Code is later launched as a subprocess by Chrome's native
+    messaging host, Gatekeeper blocks unsigned .node addons silently.
+    Running it once from the terminal lets the user approve it interactively.
+
+    Returns:
+        Warning message if Claude CLI had issues, None if OK.
+    """
+    import subprocess
+
+    try:
+        claude_path = shutil.which("claude")
+        if not claude_path:
+            return (
+                "Warning: 'claude' CLI not found in PATH.\n"
+                "Install it with: npm install -g @anthropic-ai/claude-code\n"
+                "Then run: claude --version\n"
+                "This is needed to approve any macOS security prompts."
+            )
+
+        result = subprocess.run(
+            [claude_path, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode != 0:
+            return (
+                "Warning: 'claude --version' failed. Please run it manually:\n"
+                f"  {claude_path} --version\n"
+                "This ensures macOS security prompts are handled before the extension uses it."
+            )
+
+        # On macOS, also clear quarantine on the claude installation
+        if platform.system() == "Darwin":
+            claude_dir = str(Path(claude_path).resolve().parent.parent)
+            subprocess.run(
+                ["xattr", "-rd", "com.apple.quarantine", claude_dir],
+                capture_output=True,
+                timeout=30,
+            )
+
+        return None
+    except subprocess.TimeoutExpired:
+        return (
+            "Warning: 'claude --version' timed out. If you see a macOS security popup,\n"
+            "approve it in System Settings > Privacy & Security, then run:\n"
+            "  claude --version"
+        )
+    except Exception as e:
+        return f"Warning: Could not verify Claude CLI: {e}"
+
+
 def install_native_host(extension_id: str | None = None) -> tuple[bool, str]:
     """
     Install the native messaging host.
@@ -219,7 +276,14 @@ run_host()
         if platform.system() == "Windows":
             _install_windows_registry(manifest_path)
 
-        return True, f"Native host installed successfully.\nManifest: {manifest_path}\nHost script: {host_script}\nPython interpreter: {python_path}"
+        # Preflight Claude CLI to trigger Gatekeeper prompts in the terminal
+        cli_warning = _preflight_claude_cli()
+
+        result_msg = f"Native host installed successfully.\nManifest: {manifest_path}\nHost script: {host_script}\nPython interpreter: {python_path}"
+        if cli_warning:
+            result_msg += f"\n\n{cli_warning}"
+
+        return True, result_msg
 
     except Exception as e:
         return False, f"Failed to install native host: {e}"
@@ -742,7 +806,7 @@ The HAR content is available at the path above. Use the Read tool to analyze it.
                                     {
                                         "type": "agent_event",
                                         "event_type": "thinking",
-                                        "content": block.thinking[:500] + "..." if len(block.thinking) > 500 else block.thinking,
+                                        "content": block.thinking[:2000] + "..." if len(block.thinking) > 2000 else block.thinking,
                                     }
                                 )
                             elif isinstance(block, ToolUseBlock):
@@ -761,7 +825,7 @@ The HAR content is available at the path above. Use the Read tool to analyze it.
                                 is_error = block.is_error if block.is_error else False
                                 output = ""
                                 if hasattr(block, "content"):
-                                    output = str(block.content)[:500] if block.content else ""
+                                    output = str(block.content)[:2000] if block.content else ""
 
                                 send_message(
                                     {
@@ -769,7 +833,7 @@ The HAR content is available at the path above. Use the Read tool to analyze it.
                                         "event_type": "tool_result",
                                         "tool_name": last_tool_name or "Tool",
                                         "is_error": is_error,
-                                        "output": output + "..." if len(output) >= 500 else output,
+                                        "output": output + "..." if len(output) >= 2000 else output,
                                     }
                                 )
 

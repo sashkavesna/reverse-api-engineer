@@ -1,8 +1,19 @@
 import React from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import python from 'react-syntax-highlighter/dist/esm/languages/prism/python'
+import bash from 'react-syntax-highlighter/dist/esm/languages/prism/bash'
+import json from 'react-syntax-highlighter/dist/esm/languages/prism/json'
+import javascript from 'react-syntax-highlighter/dist/esm/languages/prism/javascript'
+import typescript from 'react-syntax-highlighter/dist/esm/languages/prism/typescript'
+
+SyntaxHighlighter.registerLanguage('python', python)
+SyntaxHighlighter.registerLanguage('bash', bash)
+SyntaxHighlighter.registerLanguage('json', json)
+SyntaxHighlighter.registerLanguage('javascript', javascript)
+SyntaxHighlighter.registerLanguage('typescript', typescript)
 
 interface MarkdownRendererProps {
   content: string
@@ -11,7 +22,7 @@ interface MarkdownRendererProps {
 
 export function MarkdownRenderer({ content, className = '' }: MarkdownRendererProps) {
   return (
-    <div className={`text-[14px] text-white/90 leading-relaxed space-y-4 prose prose-invert prose-sm max-w-none ${className}`}>
+    <div className={`text-[14px] text-white/90 leading-relaxed space-y-4 prose prose-invert prose-sm max-w-none overflow-hidden break-words ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -29,11 +40,14 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
                   style={vscDarkPlus}
                   language={language}
                   PreTag="div"
+                  wrapLongLines
                   className="!bg-transparent !p-4 !m-0"
                   customStyle={{
                     margin: 0,
                     padding: 0,
                     background: 'transparent',
+                    overflowX: 'hidden',
+                    wordBreak: 'break-all',
                   }}
                   {...props}
                 >

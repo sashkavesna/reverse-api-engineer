@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from 'react'
-import { Button } from '@base-ui/react/button'
 import type { Session } from '../shared/types'
 
 interface SessionSelectorProps {
@@ -99,7 +98,7 @@ export function SessionSelector({
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <Button
+      <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-3 py-1.5 text-[16px] leading-relaxed font-normal text-text-primary hover:text-white bg-muted hover:bg-muted/80 rounded-lg transition-all"
       >
@@ -108,7 +107,7 @@ export function SessionSelector({
           {activeSession?.name || 'No Session'}
         </span>
         <ChevronIcon isOpen={isOpen} />
-      </Button>
+      </button>
 
       {isOpen && (
         <div className="absolute top-full left-0 mt-1 w-72 bg-background-secondary rounded-xl shadow-2xl border border-border z-[100] overflow-hidden">
@@ -116,12 +115,12 @@ export function SessionSelector({
           <div className="px-3 py-2 bg-muted">
             <div className="flex items-center justify-between">
               <span className="text-[14px] leading-relaxed font-normal text-white/50 uppercase tracking-wider">Sessions</span>
-              <Button
+              <button
                 onClick={handleCreateSession}
                 className="text-[14px] leading-relaxed text-primary hover:text-primary/80 font-normal transition-colors"
               >
                 + New
-              </Button>
+              </button>
             </div>
           </div>
 
@@ -186,7 +185,7 @@ export function SessionSelector({
 
                       {/* Actions */}
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button
+                        <button
                           onClick={(e) => {
                             e.stopPropagation()
                             startEditing(session)
@@ -195,9 +194,9 @@ export function SessionSelector({
                           title="Rename"
                         >
                           <EditIcon />
-                        </Button>
+                        </button>
                         {session.id !== activeSessionId && !isCapturing && (
-                          <Button
+                          <button
                             onClick={(e) => {
                               e.stopPropagation()
                               onDeleteSession(session.id)
@@ -206,7 +205,7 @@ export function SessionSelector({
                             title="Delete"
                           >
                             <TrashIcon />
-                          </Button>
+                          </button>
                         )}
                       </div>
                     </>

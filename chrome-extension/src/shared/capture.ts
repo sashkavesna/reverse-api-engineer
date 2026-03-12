@@ -117,8 +117,8 @@ class HarCaptureManager {
     this.tabId = tabId
     this.settings = { ...this.settings, ...settings }
     this.requests.clear()
-    this.entries = []
-    this.startTime = new Date()
+    // Keep existing entries so resumed captures append to previous data
+    if (!this.startTime) this.startTime = new Date()
 
     await chrome.debugger.attach({ tabId }, '1.3')
     await chrome.debugger.sendCommand({ tabId }, 'Network.enable', {
@@ -394,6 +394,10 @@ class HarCaptureManager {
     }
   }
 
+  getEntries(): RequestSummary[] {
+    return [...this.entries, ...this.requests.values()].map(e => this.summarizeRequest(e))
+  }
+
   addListener(callback: CaptureEventCallback): void {
     this.listeners.add(callback)
   }
@@ -421,6 +425,12 @@ class HarCaptureManager {
     } catch {
       return true
     }
+  }
+
+  clear(): void {
+    this.requests.clear()
+    this.entries = []
+    this.startTime = null
   }
 
   isCapturing(): boolean {

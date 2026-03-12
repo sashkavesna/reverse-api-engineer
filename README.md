@@ -371,72 +371,44 @@ A Chrome extension that provides browser-native integration with reverse-api-eng
 - **Side Panel UI**: Interactive interface for managing captures and chatting with the AI agent
 - **Native Host Integration**: Communicates with the reverse-api-engineer CLI tool
 
-### Local Development Setup
-
-To run the Chrome extension locally for development:
+### Setup
 
 **Prerequisites:**
-- Node.js and npm installed
+- Node.js and npm
 - Chrome browser
-- reverse-api-engineer CLI installed and native host configured
+- reverse-api-engineer CLI installed (`uv tool install reverse-api-engineer`)
+- Claude Code CLI installed (`npm install -g @anthropic-ai/claude-code`)
 
-**Setup Steps:**
+**Steps:**
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/kalil0321/reverse-api-engineer.git
-   cd reverse-api-engineer
-   ```
-
-2. **Navigate to the extension directory:**
+1. **Build the extension:**
    ```bash
    cd chrome-extension
-   ```
-
-3. **Install dependencies:**
-   ```bash
    npm install
-   ```
-
-4. **Build the extension:**
-   ```bash
    npm run build
    ```
-   This creates a `dist` directory with the compiled extension.
 
-5. **Load the extension in Chrome:**
-   - Open Chrome and navigate to `chrome://extensions/`
-   - Enable "Developer mode" (toggle in the top-right corner)
-   - Click "Load unpacked"
-   - Select the `chrome-extension/dist` directory
-   - The extension should now appear in your extensions list
+2. **Load in Chrome:**
+   - Go to `chrome://extensions/`
+   - Enable **Developer mode** (top-right toggle)
+   - Click **Load unpacked** and select the `chrome-extension/dist` directory
+   - **Copy the extension ID** (32-character string shown under the extension name)
 
-6. **Configure Native Host:**
-   - Ensure the native host is installed:
-     ```bash
-     reverse-api-engineer install-host
-     ```
-   - The extension communicates with the CLI via native messaging
+3. **Install the native host** (connects the extension to the CLI):
+   ```bash
+   reverse-api-engineer install-host --extension-id YOUR_EXTENSION_ID
+   ```
+
+4. **macOS only** — run this once to approve Claude Code through Gatekeeper:
+   ```bash
+   claude --version
+   ```
+   If macOS shows a security popup, go to **System Settings > Privacy & Security** and click **Allow Anyway**, then run the command again.
 
 **Development Workflow:**
 
-- **Watch mode** (auto-rebuild on changes):
-  ```bash
-  npm run dev
-  ```
-  After rebuilding, reload the extension in Chrome (`chrome://extensions/` → click the reload icon).
-
-- **Production build:**
-  ```bash
-  npm run build
-  ```
-
-- **Type checking:**
-  ```bash
-  npm run typecheck
-  ```
-
-**Status:** The extension is currently under active development. Some features may be incomplete or subject to change.
+- `npm run dev` — watch mode (auto-rebuild on changes, then reload in `chrome://extensions/`)
+- `npm run build` — production build
 
 ## 💡 Examples
 

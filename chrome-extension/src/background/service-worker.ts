@@ -9,6 +9,7 @@ import {
   saveSettings,
   getCurrentSession,
   clearCapturedRequests,
+  getCapturedRequests,
   addCapturedRequest,
   getAllSessions,
   getSession,
@@ -19,7 +20,8 @@ import {
   getAppMode,
   setAppMode,
   getSaveLocation,
-  updateSessionDualSavePaths
+  updateSessionDualSavePaths,
+  updateSessionMessages
 } from '../shared/storage'
 import type { Session, AppMode } from '../shared/types'
 
@@ -127,6 +129,21 @@ async function handleMessage(message: { type: string;[key: string]: unknown }): 
       return startCodegen()
     case 'stopCodegen':
       return stopCodegen()
+    case 'saveMessages':
+      if (activeSessionId) {
+        await updateSessionMessages(activeSessionId, message.messages as import('../shared/types').ChatMessage[])
+      }
+      return { success: true }
+    case 'clearTraffic':
+      return clearTraffic()
+    case 'getCapturedRequests': {
+      // Prefer in-memory entries from capture manager, fall back to storage
+      const entries = captureManager.getEntries()
+      if (entries.length > 0) return entries
+      return getCapturedRequests(activeSessionId || undefined)
+    }
+    case 'getTabInfo':
+      return getTabInfo()
     // Codegen state for content script
     case 'getCodegenState':
       return { codegenActive, codegenTabId }
@@ -139,7 +156,19 @@ async function getState(): Promise<Record<string, unknown>> {
   const session = await getCurrentSession()
   const sessions = await getAllSessions()
   const settings = await getSettings()
-  const stats = captureManager.getStats()
+  const liveStats = captureManager.getStats()
+
+  // Use live stats when capturing, otherwise use session's stored request count
+  const stats = captureManager.isCapturing()
+    ? liveStats
+    : { total: session?.requestCount || 0, xhr: 0, fetch: 0, websocket: 0, other: 0 }
+
+  // Get current tab info for restricted URL detection
+  let currentTabUrl = ''
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+    currentTabUrl = tab?.url || ''
+  } catch { /* ignore */ }
 
   return {
     capturing: captureManager.isCapturing(),
@@ -152,7 +181,8 @@ async function getState(): Promise<Record<string, unknown>> {
     activeSessionId,
     mode: currentMode,
     codegenActive,
-    codegenScript
+    codegenScript,
+    currentTabUrl
   }
 }
 
@@ -448,6 +478,41 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return false
 })
 
+async function clearTraffic(): Promise<{ success: boolean }> {
+  if (captureManager.isCapturing()) {
+    throw new Error('Cannot clear traffic while capturing. Stop capture first.')
+  }
+  // Clear in-memory entries
+  captureManager.clear()
+  // Clear stored requests for active session
+  if (activeSessionId) {
+    await clearCapturedRequests(activeSessionId)
+    const session = await getSession(activeSessionId)
+    if (session) {
+      session.requestCount = 0
+      await saveSession(session)
+    }
+  }
+  broadcastMessage({ type: 'trafficCleared' })
+  return { success: true }
+}
+
+async function getTabInfo(): Promise<{ url: string; isRestricted: boolean }> {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+  const url = tab?.url || ''
+  const restrictedProtocols = ['chrome:', 'chrome-extension:', 'edge:', 'about:', 'data:', 'file:', 'view-source:']
+  let isRestricted = !url
+  if (url) {
+    try {
+      const urlObj = new URL(url)
+      isRestricted = restrictedProtocols.includes(urlObj.protocol)
+    } catch {
+      isRestricted = true
+    }
+  }
+  return { url, isRestricted }
+}
+
 async function startCapture(tabId?: number): Promise<{ success: boolean; runId: string; tabId: number }> {
   if (captureManager.isCapturing()) {
     throw new Error('Already capturing')
@@ -463,11 +528,16 @@ async function startCapture(tabId?: number): Promise<{ success: boolean; runId: 
   if (!activeSessionId) {
     const { session } = await createSession()
     activeSessionId = session.id
+    currentRunId = session.runId
   }
 
-  currentRunId = generateRunId()
+  // Only generate a new run ID if the session doesn't have one yet
+  if (!currentRunId) {
+    currentRunId = generateRunId()
+  }
+
   const settings = await getSettings()
-  await clearCapturedRequests(activeSessionId || undefined)
+  // Don't clear captured requests — append to existing data on resume
 
   await captureManager.start(tabId, { captureTypes: settings.captureTypes })
 
@@ -476,8 +546,7 @@ async function startCapture(tabId?: number): Promise<{ success: boolean; runId: 
   if (session) {
     session.runId = currentRunId
     session.tabId = tabId
-    session.startTime = new Date().toISOString()
-    session.requestCount = 0
+    if (!session.startTime) session.startTime = new Date().toISOString()
     session.isActive = true
     await saveSession(session)
   }
