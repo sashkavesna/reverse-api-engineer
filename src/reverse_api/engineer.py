@@ -9,8 +9,10 @@ from claude_agent_sdk import (
     AssistantMessage,
     ClaudeAgentOptions,
     ClaudeSDKClient,
+    PermissionResultAllow,
     ResultMessage,
     TextBlock,
+    ToolPermissionContext,
     ToolResultBlock,
     ToolUseBlock,
 )
@@ -25,19 +27,20 @@ logging.getLogger("claude_agent_sdk._internal.transport.subprocess_cli").setLeve
 class ClaudeEngineer(BaseEngineer):
     """Uses Claude Agent SDK to analyze HAR files and generate Python API scripts."""
 
-    async def _handle_ask_user_question(self, tool_name: str, input_params: dict[str, Any]) -> dict[str, Any]:
+    async def _handle_ask_user_question(
+        self, tool_name: str, input_params: dict[str, Any], context: ToolPermissionContext
+    ) -> PermissionResultAllow:
         """Handle AskUserQuestion tool by prompting the user interactively."""
         if tool_name != "AskUserQuestion":
             # Default allow for other tools in acceptEdits mode
-            return {"behavior": "allow", "updatedInput": input_params}
+            return PermissionResultAllow(updated_input=input_params)
 
         questions = input_params.get("questions", [])
         answers = await self._ask_user_interactive(questions)
 
-        return {
-            "behavior": "allow",
-            "updatedInput": {"questions": questions, "answers": answers},
-        }
+        return PermissionResultAllow(
+            updated_input={"questions": questions, "answers": answers},
+        )
 
     async def analyze_and_generate(self) -> dict[str, Any] | None:
         """Run the reverse engineering analysis with Claude."""
