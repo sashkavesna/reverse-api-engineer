@@ -189,7 +189,7 @@ export function SidePanel() {
                 setCodegenVisibleDirectory(null)
               }
             }
-          })
+          }).catch(() => {})
           break
         case 'trafficCleared':
           chrome.runtime.sendMessage({ type: 'getState' }).then(res => {

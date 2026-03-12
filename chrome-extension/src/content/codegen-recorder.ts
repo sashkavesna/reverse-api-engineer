@@ -14,7 +14,7 @@ function getSelector(element: Element, depth: number = 0): string {
   }
   // Try data-testid first
   if (element.hasAttribute('data-testid')) {
-    return `[data-testid="${element.getAttribute('data-testid')}"]`
+    return `[data-testid="${CSS.escape(element.getAttribute('data-testid') || '')}"]`
   }
 
   // Try id
@@ -40,7 +40,7 @@ function getSelector(element: Element, depth: number = 0): string {
   if (element.hasAttribute('name')) {
     const name = element.getAttribute('name')
     const tag = element.tagName.toLowerCase()
-    const selector = `${tag}[name="${name}"]`
+    const selector = `${tag}[name="${CSS.escape(name || '')}"]`
     const matches = document.querySelectorAll(selector)
     if (matches.length === 1) {
       return selector

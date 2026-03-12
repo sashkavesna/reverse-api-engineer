@@ -15,8 +15,7 @@
     "storage",
     "sidePanel",
     "nativeMessaging",
-    "tabs",
-    "scripting"
+    "tabs"
   ],
   "host_permissions": [
     "<all_urls>"

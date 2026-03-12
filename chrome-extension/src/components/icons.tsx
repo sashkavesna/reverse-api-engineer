@@ -41,17 +41,17 @@ export function HugeiconsIcon({ className, size = 24 }: IconProps) {
   )
 }
 
-export function PlayIcon({ className }: IconProps) {
+export function PlayIcon({ className, size = 24 }: IconProps) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <polygon points="5 3 19 12 5 21 5 3" />
     </svg>
   )
 }
 
-export function StopIcon({ className }: IconProps) {
+export function StopIcon({ className, size = 24 }: IconProps) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <rect width="14" height="14" x="5" y="5" rx="1" />
     </svg>
   )
