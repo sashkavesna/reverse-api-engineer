@@ -229,9 +229,7 @@ Your final response should confirm the files were created and provide a brief su
 - Any limitations or caveats
 """
 
-    async def _handle_tool_permission(
-        self, tool_name: str, input_data: dict[str, Any], context: ToolPermissionContext
-    ) -> PermissionResultAllow:
+    async def _handle_tool_permission(self, tool_name: str, input_data: dict[str, Any], context: ToolPermissionContext) -> PermissionResultAllow:
         """Handle tool permission requests, with interactive UI for AskUserQuestion."""
         if tool_name == "AskUserQuestion":
             questions = input_data.get("questions", [])
@@ -244,7 +242,7 @@ Your final response should confirm the files were created and provide a brief su
 
     async def analyze_and_generate(self) -> dict[str, Any] | None:
         """Run auto mode with MCP browser integration."""
-        self.ui.header(self.run_id, self.prompt, self.model)
+        self.ui.header(self.run_id, self.prompt, self.model, mode="agent")
         self.ui.start_analysis()
         self.message_store.save_prompt(self._build_auto_prompt())
 
@@ -259,17 +257,14 @@ Your final response should confirm the files were created and provide a brief su
             ],
         }
 
-        # Required workaround: dummy hook keeps the stream open for can_use_tool
-        # See: https://platform.claude.com/docs/en/agent-sdk/user-input
+        # Required: dummy hook keeps the stream open for can_use_tool
         async def _dummy_hook(input_data: dict[str, Any], tool_use_id: str | None, context: Any) -> dict[str, Any]:
             return {"continue_": True}
 
-        prompt_text = self._build_auto_prompt()
-
-        async def _prompt_stream() -> Any:
+        async def _prompt_stream():
             yield {
                 "type": "user",
-                "message": {"role": "user", "content": prompt_text},
+                "message": {"role": "user", "content": self._build_auto_prompt()},
             }
 
         options = ClaudeAgentOptions(
@@ -278,9 +273,14 @@ Your final response should confirm the files were created and provide a brief su
             hooks={"PreToolUse": [HookMatcher(matcher=None, hooks=[_dummy_hook])]},
             cwd=str(self.scripts_dir.parent.parent),  # Project root
             model=self.model,
+            env={"CLAUDECODE": "", "CLAUDE_CODE_STREAM_CLOSE_TIMEOUT": "1800000"},
         )
 
+        final_result: dict[str, Any] | None = None
+
         try:
+            # Do not break/return inside this loop — the SDK requires the
+            # async generator to be fully consumed to avoid cancel-scope errors.
             async for message in query(prompt=_prompt_stream(), options=options):
                 # Check for usage metadata
                 if hasattr(message, "usage") and isinstance(message.usage, dict):
@@ -316,7 +316,6 @@ Your final response should confirm the files were created and provide a brief su
                     if message.is_error:
                         self.ui.error(message.result or "Unknown error")
                         self.message_store.save_error(message.result or "Unknown error")
-                        return None
                     else:
                         script_path = str(self.scripts_dir / self._get_client_filename())
                         local_path = str(self.local_scripts_dir / self._get_client_filename()) if self.local_scripts_dir else None
@@ -351,12 +350,11 @@ Your final response should confirm the files were created and provide a brief su
                                 self.ui.console.print(f"  [dim]  output: {output_tokens:,} tokens[/dim]")
                             self.ui.console.print(f"  [dim]  total cost: ${cost:.4f}[/dim]")
 
-                        result: dict[str, Any] = {
+                        final_result = {
                             "script_path": script_path,
                             "usage": self.usage_metadata,
                         }
-                        self.message_store.save_result(result)
-                        return result
+                        self.message_store.save_result(final_result)
 
         except Exception as e:
             error_msg = str(e)
@@ -375,7 +373,7 @@ Your final response should confirm the files were created and provide a brief su
                 self.ui.console.print("\n[dim]Make sure Claude Code CLI is installed: npm install -g @anthropic-ai/claude-code[/dim]")
             return None
 
-        return None
+        return final_result
 
 
 class OpenCodeAutoEngineer(OpenCodeEngineer):
@@ -404,7 +402,7 @@ class OpenCodeAutoEngineer(OpenCodeEngineer):
 
     async def analyze_and_generate(self) -> dict[str, Any] | None:
         """Run auto mode with OpenCode MCP integration."""
-        self.opencode_ui.header(self.run_id, self.prompt, self.opencode_model)
+        self.opencode_ui.header(self.run_id, self.prompt, self.opencode_model, mode="agent")
         self.opencode_ui.start_analysis()
         self.message_store.save_prompt(self._build_auto_prompt())
 
@@ -639,7 +637,7 @@ class CopilotAutoEngineer:
             return None
 
         eng = self._engineer
-        eng.ui.header(eng.run_id, eng.prompt, eng.copilot_model, eng.sdk)
+        eng.ui.header(eng.run_id, eng.prompt, eng.copilot_model, eng.sdk, mode="agent")
         eng.ui.start_analysis()
 
         auto_prompt = ClaudeAutoEngineer._build_auto_prompt(eng)

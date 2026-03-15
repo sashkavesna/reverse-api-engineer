@@ -28,9 +28,7 @@ logging.getLogger("claude_agent_sdk._internal.transport.subprocess_cli").setLeve
 class ClaudeEngineer(BaseEngineer):
     """Uses Claude Agent SDK to analyze HAR files and generate Python API scripts."""
 
-    async def _handle_tool_permission(
-        self, tool_name: str, input_data: dict[str, Any], context: ToolPermissionContext
-    ) -> PermissionResultAllow:
+    async def _handle_tool_permission(self, tool_name: str, input_data: dict[str, Any], context: ToolPermissionContext) -> PermissionResultAllow:
         """Handle tool permission requests, with interactive UI for AskUserQuestion."""
         if tool_name == "AskUserQuestion":
             questions = input_data.get("questions", [])
@@ -44,21 +42,19 @@ class ClaudeEngineer(BaseEngineer):
 
     async def analyze_and_generate(self) -> dict[str, Any] | None:
         """Run the reverse engineering analysis with Claude."""
-        self.ui.header(self.run_id, self.prompt, self.model, self.sdk)
+        self.ui.header(self.run_id, self.prompt, self.model, self.sdk, mode="engineer")
         self.ui.start_analysis()
         self.message_store.save_prompt(self._build_analysis_prompt())
 
-        # Required workaround: dummy hook keeps the stream open for can_use_tool
+        # Required: dummy hook keeps the stream open for can_use_tool
         # See: https://platform.claude.com/docs/en/agent-sdk/user-input
         async def _dummy_hook(input_data: dict[str, Any], tool_use_id: str | None, context: Any) -> dict[str, Any]:
             return {"continue_": True}
 
-        prompt_text = self._build_analysis_prompt()
-
-        async def _prompt_stream() -> Any:
+        async def _prompt_stream():
             yield {
                 "type": "user",
-                "message": {"role": "user", "content": prompt_text},
+                "message": {"role": "user", "content": self._build_analysis_prompt()},
             }
 
         options = ClaudeAgentOptions(
@@ -66,9 +62,14 @@ class ClaudeEngineer(BaseEngineer):
             hooks={"PreToolUse": [HookMatcher(matcher=None, hooks=[_dummy_hook])]},
             cwd=str(self.scripts_dir.parent.parent),  # Project root
             model=self.model,
+            env={"CLAUDECODE": "", "CLAUDE_CODE_STREAM_CLOSE_TIMEOUT": "1800000"},
         )
 
+        final_result: dict[str, Any] | None = None
+
         try:
+            # Do not break/return inside this loop — the SDK requires the
+            # async generator to be fully consumed to avoid cancel-scope errors.
             async for message in query(prompt=_prompt_stream(), options=options):
                 # Check for usage metadata in message if applicable
                 if hasattr(message, "usage") and isinstance(message.usage, dict):
@@ -104,7 +105,6 @@ class ClaudeEngineer(BaseEngineer):
                     if message.is_error:
                         self.ui.error(message.result or "Unknown error")
                         self.message_store.save_error(message.result or "Unknown error")
-                        return None
                     else:
                         script_path = str(self.scripts_dir / self._get_client_filename())
                         local_path = str(self.local_scripts_dir / self._get_client_filename()) if self.local_scripts_dir else None
@@ -117,7 +117,6 @@ class ClaudeEngineer(BaseEngineer):
                             cache_creation_tokens = self.usage_metadata.get("cache_creation_input_tokens", 0)
                             cache_read_tokens = self.usage_metadata.get("cache_read_input_tokens", 0)
 
-                            # Calculate cost using shared pricing module
                             from .pricing import calculate_cost
 
                             cost = calculate_cost(
@@ -129,7 +128,6 @@ class ClaudeEngineer(BaseEngineer):
                             )
                             self.usage_metadata["estimated_cost_usd"] = cost
 
-                            # Display usage breakdown
                             self.ui.console.print("  [dim]Usage:[/dim]")
                             if input_tokens > 0:
                                 self.ui.console.print(f"  [dim]  input: {input_tokens:,} tokens[/dim]")
@@ -141,12 +139,11 @@ class ClaudeEngineer(BaseEngineer):
                                 self.ui.console.print(f"  [dim]  output: {output_tokens:,} tokens[/dim]")
                             self.ui.console.print(f"  [dim]  total cost: ${cost:.4f}[/dim]")
 
-                        result: dict[str, Any] = {
+                        final_result = {
                             "script_path": script_path,
                             "usage": self.usage_metadata,
                         }
-                        self.message_store.save_result(result)
-                        return result
+                        self.message_store.save_result(final_result)
 
         except Exception as e:
             self.ui.error(str(e))
@@ -154,7 +151,7 @@ class ClaudeEngineer(BaseEngineer):
             self.ui.console.print("\n[dim]Make sure Claude Code CLI is installed: npm install -g @anthropic-ai/claude-code[/dim]")
             return None
 
-        return None
+        return final_result
 
 
 # Keep old class name for backwards compatibility
