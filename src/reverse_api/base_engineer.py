@@ -15,6 +15,8 @@ from .utils import generate_folder_name, get_docs_dir, get_history_path, get_scr
 
 DEBUG = os.environ.get("DEBUG", "0") == "1"
 
+OTHER_OPTION = "Other (type your answer)"
+
 
 class BaseEngineer(ABC):
     """Abstract base class for API reverse engineering implementations."""
@@ -172,6 +174,7 @@ class BaseEngineer(ABC):
                         for opt in options
                     ]
                     if choices:
+                        choices.append(OTHER_OPTION)
                         selected = await questionary.checkbox(
                             f" > {question_text}",
                             choices=choices,
@@ -188,7 +191,20 @@ class BaseEngineer(ABC):
                         if selected is None:
                             raise KeyboardInterrupt
 
-                        labels = [s.split(" - ")[0] if " - " in s else s for s in selected]
+                        has_other = OTHER_OPTION in selected
+                        labels = [s.split(" - ")[0] if " - " in s else s for s in selected if s != OTHER_OPTION]
+
+                        if has_other:
+                            other_text = await questionary.text(
+                                "   > Your answer: ",
+                                qmark="",
+                                style=questionary.Style([("question", f"fg:{THEME_SECONDARY}")]),
+                            ).ask_async()
+                            if other_text is None:
+                                raise KeyboardInterrupt
+                            if other_text.strip():
+                                labels.append(other_text.strip())
+
                         answers[question_text] = ", ".join(labels)
                     else:
                         answer = await questionary.text(
@@ -207,6 +223,7 @@ class BaseEngineer(ABC):
                         for opt in options
                     ]
                     if choices:
+                        choices.append(OTHER_OPTION)
                         answer = await questionary.select(
                             f" > {question_text}",
                             choices=choices,
@@ -222,8 +239,18 @@ class BaseEngineer(ABC):
                         if answer is None:
                             raise KeyboardInterrupt
 
-                        label = answer.split(" - ")[0] if " - " in answer else answer
-                        answers[question_text] = label
+                        if answer == OTHER_OPTION:
+                            answer = await questionary.text(
+                                "   > Your answer: ",
+                                qmark="",
+                                style=questionary.Style([("question", f"fg:{THEME_SECONDARY}")]),
+                            ).ask_async()
+                            if answer is None:
+                                raise KeyboardInterrupt
+                            answers[question_text] = answer.strip()
+                        else:
+                            label = answer.split(" - ")[0] if " - " in answer else answer
+                            answers[question_text] = label
                     else:
                         answer = await questionary.text(
                             f" > {question_text}",
@@ -242,6 +269,21 @@ class BaseEngineer(ABC):
 
         self.ui.console.print()
         return answers
+
+    async def _prompt_follow_up(self) -> str | None:
+        """Prompt user for a follow-up message. Returns None to finish."""
+        try:
+            self.ui.console.print(f"  [{THEME_PRIMARY}]>[/{THEME_PRIMARY}] [dim]type a follow-up or press Enter to finish[/dim]")
+            answer = await questionary.text(
+                "  > ",
+                qmark="",
+                style=questionary.Style([("question", f"fg:{THEME_SECONDARY}")]),
+            ).ask_async()
+            if answer is None or answer.strip() == "":
+                return None
+            return answer.strip()
+        except KeyboardInterrupt:
+            return None
 
     @staticmethod
     def _get_opt_field(opt: Any, field: str) -> str:
@@ -592,6 +634,14 @@ Here is the output directory where you should save your generated files:
 
 **IMPORTANT: You have access to the AskUserQuestion tool to ask clarifying questions during your analysis.**
 Use this tool when you need to clarify functional requirements, prioritize features, choose between implementation approaches, or gather any other information that would help you generate better {task_description}.
+
+The AskUserQuestion tool supports:
+- **Multiple questions** in a single call (list of question objects)
+- **Single-select** questions with predefined options (user picks one, or types a custom answer)
+- **Multi-select** questions with predefined options (user picks multiple, or adds a custom answer)
+- **Free-form** questions with no options (user types their answer freely)
+
+Use free-form questions (empty options list) for open-ended input like URLs, credentials, descriptions, or any question where predefined choices don't make sense.
 
 Your task is to:
 
