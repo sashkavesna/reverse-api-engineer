@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-03-17
+
+### Added
+- **Follow-up chat**: After a run completes, type follow-up messages to iterate in the same session without creating new run IDs or folders. Press Enter to finish
+- **Abort run (Ctrl+C)**: Gracefully cancel a running agent/engineer session and return to the REPL instead of exiting the app
+- **AskUserQuestion free mode**: All select/checkbox prompts now include "Other (type your answer)" so users can always provide free-text input. Updated agent prompt to document free-form, multi-select, and multi-question capabilities
+- **Random task suggestions (Ctrl+R)**: Press Ctrl+R in agent mode to fill the prompt with a random curated task idea. Press again to cycle
+
+### Fixed
+- **Usage tracking across follow-ups**: Token counts now accumulate across all turns in a session instead of being overwritten by the last turn
+- **Agent mode follow-up**: Auto engineer (agent mode) was using a copy-pasted streaming loop without follow-up support; now reuses the shared conversation loop
+
 ## [0.4.5] - 2026-03-15
 
 ### Fixed
