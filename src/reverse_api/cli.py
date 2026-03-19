@@ -50,6 +50,9 @@ from .utils import (
     parse_record_only_tag,
 )
 
+setproctitle.setproctitle("reverse-api-engineer")
+setproctitle.setthreadtitle("reverse-api-engineer")
+
 console = Console()
 config_manager = ConfigManager(get_config_path())
 session_manager = SessionManager(get_history_path())
@@ -375,8 +378,6 @@ def main(ctx: click.Context):
     Run without a subcommand to start the interactive REPL; use agent, manual,
     or engineer for CLI mode.
     """
-    setproctitle.setproctitle("reverse-api-engineer")
-    setproctitle.setthreadtitle("reverse-api-engineer")
     if ctx.invoked_subcommand is None:
         repl_loop()
 

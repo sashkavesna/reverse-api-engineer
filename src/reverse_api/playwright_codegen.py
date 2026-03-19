@@ -16,32 +16,33 @@ class PlaywrightCodeGenerator:
     def _clean_actions(self, actions: List[RecordedAction]) -> List[RecordedAction]:
         """Clean up actions (deduplicate fills, remove redundant events)."""
         cleaned = []
-        
+
         for i, action in enumerate(actions):
             # For 'fill' actions on the same selector, only keep the last one
             if action.type == "fill":
                 # Look ahead to see if there's another fill for this selector
                 is_last_fill = True
-                for next_action in actions[i + 1:]:
+                for next_action in actions[i + 1 :]:
                     if next_action.type == "fill" and next_action.selector == action.selector:
                         is_last_fill = False
                         break
                     if next_action.type != "fill":
                         # If interaction changes (e.g. click), we must keep the current fill
                         break
-                
+
                 if is_last_fill:
                     cleaned.append(action)
             else:
                 cleaned.append(action)
-                
+
         return cleaned
-    
+
     def _get_base_url(self, url: str | None) -> str | None:
         """Extract base URL (without query params) for comparison."""
         if not url:
             return None
         from urllib.parse import urlparse
+
         parsed = urlparse(url)
         return f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
 
@@ -64,7 +65,7 @@ class PlaywrightCodeGenerator:
             '    "--disable-extensions",',
             '    "--no-first-run",',
             '    "--no-default-browser-check",',
-            ']',
+            "]",
             "",
             "",
             "def main():",
@@ -83,8 +84,8 @@ class PlaywrightCodeGenerator:
         ]
 
         if self.start_url:
-            lines.append(f'        # Start URL')
-            lines.append(f'        page.goto({json.dumps(self.start_url)})')
+            lines.append(f"        # Start URL")
+            lines.append(f"        page.goto({json.dumps(self.start_url)})")
             lines.append("")
 
         current_url = self.start_url
@@ -93,14 +94,14 @@ class PlaywrightCodeGenerator:
         for action in self.actions:
             if action.type == "click" and action.selector:
                 lines.append(f"        page.click({json.dumps(action.selector)})")
-            
+
             elif action.type == "fill" and action.selector and action.value is not None:
                 # Use json.dumps to safely escape newlines, quotes, and backslashes
                 lines.append(f"        page.fill({json.dumps(action.selector)}, {json.dumps(action.value)})")
-            
+
             elif action.type == "press" and action.selector and action.value is not None:
                 lines.append(f"        page.press({json.dumps(action.selector)}, {json.dumps(action.value)})")
-            
+
             elif action.type == "navigate":
                 # Skip if same as start URL or very similar (just different query params)
                 nav_base = self._get_base_url(action.url)
@@ -113,18 +114,20 @@ class PlaywrightCodeGenerator:
             # Add a small delay between actions as requested
             lines.append("        page.wait_for_timeout(1000)")
 
-        lines.extend([
-            "",
-            "        # Keep browser open for a moment",
-            "        page.wait_for_timeout(2000)",
-            "",
-            "        context.close()",
-            "        browser.close()",
-            "",
-            "",
-            "if __name__ == '__main__':",
-            "    main()",
-            ""
-        ])
+        lines.extend(
+            [
+                "",
+                "        # Keep browser open for a moment",
+                "        page.wait_for_timeout(2000)",
+                "",
+                "        context.close()",
+                "        browser.close()",
+                "",
+                "",
+                "if __name__ == '__main__':",
+                "    main()",
+                "",
+            ]
+        )
 
         return "\n".join(lines)

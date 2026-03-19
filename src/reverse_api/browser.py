@@ -210,11 +210,11 @@ class ManualBrowser:
         self.output_dir = output_dir
         self.use_real_chrome = use_real_chrome
         self.enable_action_recording = enable_action_recording
-        
+
         self.har_dir = get_har_dir(run_id, output_dir)
         self.har_path = self.har_dir / "recording.har"
         self.metadata_path = self.har_dir / "metadata.json"
-        
+
         self._playwright = None
         self._browser: Browser | None = None
         self._context: BrowserContext | None = None
@@ -226,15 +226,15 @@ class ManualBrowser:
 
     def _inject_action_recorder(self, page: Page) -> None:
         """Inject action recording script into page.
-        
+
         Uses console.log + page.on('console') for reliable capture.
         Works best with stealth Chromium mode (not real Chrome).
         """
         if not self.enable_action_recording:
             return
-        
+
         # Simple JS that logs actions to console with a special prefix
-        recorder_js = '''
+        recorder_js = """
         window.__recordedActions = [];
         window.__lastUrl = null;
         
@@ -378,34 +378,35 @@ class ManualBrowser:
                 }
             }
         }
-        '''
-        
+        """
+
         # Listen to console for actions
         import json
+
         last_url = [None]  # Mutable to track last URL
-        
+
         def on_console(msg):
             text = msg.text
-            if text.startswith('__ACTION__'):
+            if text.startswith("__ACTION__"):
                 try:
                     action_json = text[10:]  # Remove '__ACTION__' prefix
                     action_data = json.loads(action_json)
-                    
+
                     # Filter duplicate navigations
-                    if action_data.get('type') == 'navigate':
-                        url = action_data.get('url', '')
+                    if action_data.get("type") == "navigate":
+                        url = action_data.get("url", "")
                         if url == last_url[0]:
                             return  # Skip duplicate
                         last_url[0] = url
-                    
+
                     if self.action_recorder:
                         self.action_recorder.add_action(RecordedAction(**action_data))
                 except Exception as e:
                     console.print(f" [dim]action parse error: {e}[/dim]")
-        
+
         page.on("console", on_console)
         page.add_init_script(recorder_js)
-        
+
         console.print(" [dim]action recording enabled[/dim]")
 
     def _save_metadata(self, end_time: str) -> None:
