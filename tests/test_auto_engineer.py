@@ -110,6 +110,7 @@ class TestClaudeAutoEngineerAnalyze:
                     eng = ClaudeAutoEngineer(**defaults)
                     eng.scripts_dir = tmp_path / "scripts"
                     eng.scripts_dir.mkdir(parents=True, exist_ok=True)
+                    eng._prompt_follow_up = AsyncMock(return_value=None)
                     return eng
 
     @pytest.mark.asyncio

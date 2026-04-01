@@ -623,7 +623,7 @@ class ManualBrowser:
 
         if self._context:
             # Save profile if needed
-            if hasattr(self, 'profile_name') and self.profile_name:
+            if self.profile_name:
                 try:
                     from .vault import save_profile
                     profile_path = save_profile(self.profile_name, self._context)

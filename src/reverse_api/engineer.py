@@ -74,11 +74,11 @@ class ClaudeEngineer(BaseEngineer):
                         is_error = block.is_error if block.is_error else False
 
                         output = None
-                        if hasattr(block, "content"):
+                        if getattr(block, "content", None) is not None:
                             output = block.content
-                        elif hasattr(block, "result"):
+                        elif getattr(block, "result", None) is not None:
                             output = block.result
-                        elif hasattr(block, "output"):
+                        elif getattr(block, "output", None) is not None:
                             output = block.output
 
                         tool_name = last_tool_name or "Tool"
