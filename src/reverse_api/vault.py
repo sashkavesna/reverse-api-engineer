@@ -110,3 +110,63 @@ def load_profile(name: str) -> httpx.Cookies:
         )
 
     return httpx_cookies
+
+
+def list_profiles() -> list[dict]:
+    """List all saved profiles with metadata.
+
+    Returns:
+        List of dicts with keys: name, path, cookie_count, domains, modified
+    """
+    profiles_dir = get_profiles_dir()
+    results = []
+
+    for profile_path in sorted(profiles_dir.glob("*.json")):
+        try:
+            with open(profile_path, "r", encoding="utf-8") as f:
+                state = json.load(f)
+
+            cookies = state.get("cookies", [])
+            domains = sorted(set(c.get("domain", "").lstrip(".") for c in cookies if c.get("domain")))
+
+            results.append({
+                "name": profile_path.stem,
+                "path": profile_path,
+                "cookie_count": len(cookies),
+                "domains": domains,
+                "modified": profile_path.stat().st_mtime,
+            })
+        except (json.JSONDecodeError, KeyError):
+            results.append({
+                "name": profile_path.stem,
+                "path": profile_path,
+                "cookie_count": 0,
+                "domains": [],
+                "modified": profile_path.stat().st_mtime,
+            })
+
+    return results
+
+
+def delete_profile(name: str) -> Path:
+    """Delete a profile from the vault.
+
+    Args:
+        name: The name of the profile to delete
+
+    Returns:
+        Path of the deleted file
+
+    Raises:
+        ProfileNotFoundError: If the profile does not exist
+    """
+    name = _validate_profile_name(name)
+    profile_path = get_profiles_dir() / f"{name}.json"
+
+    if not profile_path.exists():
+        raise ProfileNotFoundError(
+            f'Profile "{name}" not found.'
+        )
+
+    profile_path.unlink()
+    return profile_path

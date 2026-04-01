@@ -1237,6 +1237,44 @@ def vault_auth(profile_name, url):
     console.print(f" [dim]>[/dim] [green]vault auth complete[/green]")
 
 
+@vault.command("list")
+def vault_list():
+    """List all saved browser profiles."""
+    from .vault import list_profiles
+    from datetime import datetime
+
+    profiles = list_profiles()
+
+    if not profiles:
+        console.print(" [dim]no profiles saved yet[/dim]")
+        console.print(' [dim]run[/dim] [cyan]reverse-api-engineer vault auth <name>[/cyan] [dim]to create one[/dim]')
+        return
+
+    console.print(f" [dim]>[/dim] [white]{len(profiles)} profile(s)[/white]\n")
+
+    for p in profiles:
+        modified = datetime.fromtimestamp(p["modified"]).strftime("%Y-%m-%d %H:%M")
+        domains_str = ", ".join(p["domains"][:3])
+        if len(p["domains"]) > 3:
+            domains_str += f" +{len(p['domains']) - 3}"
+
+        console.print(f"   [cyan]{p['name']}[/cyan]  [dim]{p['cookie_count']} cookies[/dim]  [dim]{domains_str}[/dim]  [dim]{modified}[/dim]")
+
+
+@vault.command("delete")
+@click.argument("profile_name")
+def vault_delete(profile_name):
+    """Delete a saved browser profile."""
+    from .vault import delete_profile, ProfileNotFoundError
+
+    try:
+        delete_profile(profile_name)
+        console.print(f" [dim]>[/dim] [green]profile[/green] [cyan]{profile_name}[/cyan] [green]deleted[/green]")
+    except ProfileNotFoundError:
+        console.print(f" [red]profile \"{profile_name}\" not found[/red]")
+        raise SystemExit(1)
+
+
 @main.command()
 @click.option("--prompt", "-p", default=None, help="Capture description.")
 @click.option("--url", "-u", default=None, help="Starting URL.")
