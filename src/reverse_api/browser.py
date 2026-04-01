@@ -204,12 +204,14 @@ class ManualBrowser:
         output_dir: str | None = None,
         use_real_chrome: bool = True,  # New option to use real Chrome
         enable_action_recording: bool = False,
+        profile_name: str | None = None,
     ):
         self.run_id = run_id
         self.prompt = prompt
         self.output_dir = output_dir
         self.use_real_chrome = use_real_chrome
         self.enable_action_recording = enable_action_recording
+        self.profile_name = profile_name
 
         self.har_dir = get_har_dir(run_id, output_dir)
         self.har_path = self.har_dir / "recording.har"
@@ -620,6 +622,15 @@ class ManualBrowser:
         console.print(" [dim]browser closed[/dim]")
 
         if self._context:
+            # Save profile if needed
+            if hasattr(self, 'profile_name') and self.profile_name:
+                try:
+                    from .vault import save_profile
+                    profile_path = save_profile(self.profile_name, self._context)
+                    console.print(f" [dim]profile saved: {profile_path.name}[/dim]")
+                except Exception as e:
+                    console.print(f" [yellow]error saving profile: {e}[/yellow]")
+
             with Status(
                 " [dim]handling har... can take a bit[/dim]",
                 console=console,

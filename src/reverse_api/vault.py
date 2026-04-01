@@ -46,7 +46,7 @@ def _validate_profile_name(name: str) -> str:
     return name
 
 
-async def save_profile(name: str, context: 'BrowserContext') -> Path:
+def save_profile(name: str, context: 'BrowserContext') -> Path:
     """Save the Playwright browser context state to the vault.
 
     Args:
@@ -60,7 +60,7 @@ async def save_profile(name: str, context: 'BrowserContext') -> Path:
     profile_path = get_profiles_dir() / f"{name}.json"
 
     # Playwright's storage_state extracts cookies and localStorage
-    state = await context.storage_state()
+    state = context.storage_state()
 
     with open(profile_path, "w", encoding="utf-8") as f:
         json.dump(state, f, indent=2)

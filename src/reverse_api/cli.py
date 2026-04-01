@@ -1209,6 +1209,34 @@ def handle_messages(run_id: str, mode_color=THEME_PRIMARY):
     console.print()
 
 
+@main.group()
+def vault():
+    """Manage browser profiles and session state."""
+    pass
+
+
+@vault.command("auth")
+@click.argument("profile_name")
+@click.option("--url", "-u", default=None, help="Initial URL to start authentication from.")
+def vault_auth(profile_name, url):
+    """Authenticate and save session to a profile."""
+    run_id = generate_run_id()
+    prompt = f"Authenticate for profile: {profile_name}"
+
+    console.print(f" [dim]>[/dim] [white]starting vault auth for profile:[/white] [cyan]{profile_name}[/cyan]")
+    if url:
+        console.print(f" [dim]>[/dim] [dim]url:[/dim] {url}")
+
+    browser = ManualBrowser(
+        run_id=run_id,
+        prompt=prompt,
+        profile_name=profile_name,
+        use_real_chrome=True,
+    )
+    browser.start(start_url=url)
+    console.print(f" [dim]>[/dim] [green]vault auth complete[/green]")
+
+
 @main.command()
 @click.option("--prompt", "-p", default=None, help="Capture description.")
 @click.option("--url", "-u", default=None, help="Starting URL.")
