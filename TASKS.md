@@ -53,13 +53,13 @@
 ---
 
 ### [TASK-005] Автономный исполнитель `runner.py` на `curl_cffi`
-- **Статус:** ⏳ `PENDING`
+- **Статус:** ✅ `DONE`
 - **Requires:** `TASK-002`, `TASK-004`
 - **Inputs:** `ServiceRecipe`, `temp_mail.py`, `vault.py`
 - **Outputs:** `src/reverse_api/runner.py`, `tests/test_runner.py`
 - **Разрешенные пути:** `src/reverse_api/runner.py`, `tests/test_runner.py`
 - **Запреты:** использование Chromium/Playwright на этапе повтора (ANTI-1); использование голого `httpx` без TLS-эмуляции (ANTI-2).
-- **Критерий приемки (E1–E4):** Исполнитель выполняет HTTP-шаги через `curl_cffi`, запрашивает почту, подтверждает OTP и сохраняет профиль в `vault.py`. Потребление памяти < 50 МБ.
+- **Критерий приемки (E1–E4):** Исполнитель выполняет HTTP-шаги через `curl_cffi`, запрашивает почту, подтверждает OTP/ссылку и сохраняет профиль в `vault.py`. Потребление памяти < 50 МБ (3/3 тестов зеленые).
 
 ---
 
