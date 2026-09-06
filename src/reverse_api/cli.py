@@ -1234,14 +1234,15 @@ def vault_auth(profile_name, url):
         use_real_chrome=True,
     )
     browser.start(start_url=url)
-    console.print(f" [dim]>[/dim] [green]vault auth complete[/green]")
+    console.print(" [dim]>[/dim] [green]vault auth complete[/green]")
 
 
 @vault.command("list")
 def vault_list():
     """List all saved browser profiles."""
-    from .vault import list_profiles
     from datetime import datetime
+
+    from .vault import list_profiles
 
     profiles = list_profiles()
 
@@ -1265,13 +1266,102 @@ def vault_list():
 @click.argument("profile_name")
 def vault_delete(profile_name):
     """Delete a saved browser profile."""
-    from .vault import delete_profile, ProfileNotFoundError
+    from .vault import ProfileNotFoundError, delete_profile
 
     try:
         delete_profile(profile_name)
         console.print(f" [dim]>[/dim] [green]profile[/green] [cyan]{profile_name}[/cyan] [green]deleted[/green]")
     except ProfileNotFoundError:
         console.print(f" [red]profile \"{profile_name}\" not found[/red]")
+        raise SystemExit(1)
+
+
+@main.command("recon")
+@click.argument("target_url")
+@click.option("--name", "-n", default=None, help="Name for the service recipe.")
+@click.option("--output", "-o", default=None, help="Custom output path for the synthesized recipe.")
+@click.option("--timeout", "-t", default=300, help="Interactive browser timeout in seconds.")
+def recon_cmd(target_url: str, name: str | None, output: str | None, timeout: int):
+    """Run interactive reconnaissance on target_url and synthesize a ServiceRecipe."""
+    from urllib.parse import urlparse
+
+    from .recon import ReconEngine
+    from .synthesizer import RecipeSynthesizer
+
+    parsed = urlparse(target_url)
+    service_name = name or (parsed.netloc.replace(".", "_") if parsed.netloc else "service")
+
+    console.print(f" [dim]>[/dim] [white]starting interactive recon for:[/white] [cyan]{target_url}[/cyan]")
+    console.print(" [dim]>[/dim] [dim]perform registration in the opened browser, then close it[/dim]")
+
+    engine = ReconEngine()
+    records = engine.run_interactive(target_url, timeout_sec=timeout)
+
+    if not records:
+        console.print(" [red]no relevant network requests captured[/red]")
+        raise SystemExit(1)
+
+    console.print(f" [dim]>[/dim] [green]captured {len(records)} relevant requests[/green]")
+    console.print(" [dim]>[/dim] [white]synthesizing service recipe...[/white]")
+
+    synth = RecipeSynthesizer()
+    try:
+        recipe = synth.synthesize(records, service_name=service_name)
+    except Exception as exc:
+        console.print(f" [red]synthesis failed: {exc}[/red]")
+        raise SystemExit(1) from None
+
+    recipe_path = Path(output) if output else Path.cwd() / "recipes" / f"{service_name}.json"
+    saved_path = recipe.save(recipe_path)
+
+    console.print(f" [dim]>[/dim] [green]recipe saved to:[/green] [cyan]{saved_path}[/cyan]")
+    console.print(f" [dim]>[/dim] [dim]to run replay execute:[/dim] [cyan]reverse-api-engineer run-recipe {saved_path}[/cyan]")
+
+
+@main.command("run-recipe")
+@click.argument("recipe_path")
+@click.option("--profile-name", "-p", default=None, help="Profile name for saving cookies to Vault.")
+@click.option("--email", "-e", default=None, help="Custom email address instead of temp_mail.")
+@click.option("--password", default=None, help="Custom password.")
+@click.option("--timeout", default=60, help="Timeout waiting for verification email.")
+def run_recipe_cmd(recipe_path: str, profile_name: str | None, email: str | None, password: str | None, timeout: int):
+    """Autonomously execute a ServiceRecipe using curl_cffi and temp_mail."""
+    from .runner import AutonomousRunner
+    from .synthesizer import ServiceRecipe
+
+    path = Path(recipe_path)
+    if not path.exists():
+        console.print(f" [red]recipe file not found:[/red] {recipe_path}")
+        raise SystemExit(1)
+
+    try:
+        recipe = ServiceRecipe.load(path)
+    except Exception as exc:
+        console.print(f" [red]failed loading recipe:[/red] {exc}")
+        raise SystemExit(1) from None
+
+    console.print(f" [dim]>[/dim] [white]executing recipe:[/white] [cyan]{recipe.name}[/cyan] [dim]({recipe.base_url})[/dim]")
+
+    runner = AutonomousRunner()
+    result = runner.run(
+        recipe=recipe,
+        profile_name=profile_name,
+        custom_email=email,
+        custom_password=password,
+        wait_for_mail_timeout_sec=timeout,
+    )
+
+    if result.success:
+        console.print(" [dim]>[/dim] [green]registration successful![/green]")
+        console.print(f"   [white]email:[/white] [cyan]{result.email}[/cyan]")
+        console.print(f"   [white]password:[/white] [dim]{result.password}[/dim]")
+        console.print(f"   [white]profile in vault:[/white] [cyan]{result.profile_name}[/cyan] [dim]({result.cookies_count} cookies)[/dim]")
+        if result.verification_code:
+            console.print(f"   [white]verification code:[/white] [green]{result.verification_code}[/green]")
+        if result.verification_url:
+            console.print(f"   [white]verification url:[/white] [green]{result.verification_url}[/green]")
+    else:
+        console.print(f" [red]registration failed:[/red] {result.error}")
         raise SystemExit(1)
 
 

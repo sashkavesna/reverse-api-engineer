@@ -64,10 +64,10 @@
 ---
 
 ### [TASK-006] CLI интеграция команд
-- **Статус:** ⏳ `PENDING`
+- **Статус:** ✅ `DONE`
 - **Requires:** `TASK-003`, `TASK-005`
 - **Inputs:** CLI модуль
 - **Outputs:** `src/reverse_api/cli.py`
 - **Разрешенные пути:** `src/reverse_api/cli.py`
 - **Запреты:** раздувание TUI и блокировка неинтерактивных сценариев.
-- **Критерий приемки (E1–E4):** Поддержка команд `reverse-api-engineer recon <url>` и `reverse-api-engineer run-recipe <recipe.json>`.
+- **Критерий приемки (E1–E4):** Поддержка команд `reverse-api-engineer recon <url>` и `reverse-api-engineer run-recipe <recipe.json>` (проверено --help и CLI регистрация).
