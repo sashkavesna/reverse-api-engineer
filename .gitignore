@@ -102,3 +102,11 @@ chrome-extension-old
 debug/
 
 .playwright-mcp/
+
+# Life OS Hygiene & State Gate
+*.bak
+*.backup*
+*.tmp
+scratch/
+recordings/
+recipes/*.local.json
