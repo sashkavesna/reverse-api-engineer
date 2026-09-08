@@ -1,0 +1,21 @@
+{
+  "name": "artur2k_ru",
+  "base_url": "https://artur2k.ru",
+  "verification_mode": "otp_code",
+  "steps": [
+    {
+      "name": "submit_registration",
+      "url": "https://artur2k.ru/seo/functions000.php",
+      "method": "POST",
+      "headers": {
+        "referer": "https://artur2k.ru/tools/drop-list/",
+        "x-requested-with": "XMLHttpRequest",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        "accept": "application/json, text/javascript, */*; q=0.01",
+        "content-type": "application/x-www-form-urlencoded; charset=UTF-8"
+      },
+      "payload": "query_orig=shop&sort=iks",
+      "extracts": []
+    }
+  ]
+}
